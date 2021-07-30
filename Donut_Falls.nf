@@ -10,19 +10,20 @@ params.outdir = workflow.launchDir + '/donut_falls'
 
 params.maxcpus = Runtime.runtime.availableProcessors()
 println("The maximum number of CPUS used in this workflow is ${params.maxcpus}")
-if ( params.maxcpus < 5 ) {
+if ( params.maxcpus < 12 ) {
   params.medcpus = params.maxcpus
 } else {
-  params.medcpus = 5
+  params.medcpus = 12
 }
 
 params.sample_key = workflow.launchDir + '/sample_key.csv'
 if (params.sample_key.exists()) {
   Channel
     .fromPath(params.sample_key, type:'file')
-    .set{sample_key}
+    .into{sample_key ; sample_key_illumina}
 } else {
   sample_key = Channel.empty()
+  sample_key_illumina = Channel.empty()
 }
 
 // params.fastq_concat = false
@@ -86,7 +87,7 @@ if ( params.phase2 ) {
   println("Beginning second phase of workflow.")
   Channel
     .fromPath("${params.cluster_directory}/*", type:'dir')
-    .view { "Clusters to reconcile : $it" }
+    .view { "Samples with clusters to reconcile : $it" }
     .into { clusters_dotplot ; clusters_reconcile }
 } else {
   Channel
@@ -104,10 +105,11 @@ if ( params.phase2 && params.illumina ) {
       println("Could not find paired-end Illumina reads. Set with directory with 'params.illumina_fastq'")
       exit 1
     }
-    .combine(sample_key)
-    .set { illumina_fastq }
+    .combine(sample_key_illumina)
+    .view()
+    .set { illumina_fastqs }
 } else {
-  illumina_fastq = Channel.empty()
+  illumina_fastqs = Channel.empty()
 }
 
 // process rename {
@@ -159,7 +161,7 @@ process combine_and_rename {
   container 'staphb/filtlong:latest'
 
   input:
-  tuple path(barcode), file(sample_key) from fastq_pass_directory
+  set path(barcode), file(sample_key) from fastq_pass_directory
 
   output:
   tuple env(sample), file("${task.process}/*.fastq.gz") into combined_fastq
@@ -207,10 +209,10 @@ process filtlong {
   container 'staphb/filtlong:latest'
 
   input:
-  tuple val(sample), file(fastq) from combined_fastq
+  set val(sample), file(fastq) from combined_fastq
 
   output:
-  tuple sample, file("${task.process}/${sample}_filtered.fastq") into filtered_fastq_subsample, filtered_fastq_cluster, filtered_fastq_reconcile
+  tuple sample, file("${task.process}/${sample}_filtered.fastq") into filtered_fastq_subsample, filtered_fastq_cluster, filtered_fastq_reconcile, filtered_fastq_partician, filtered_fastq_medaka
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -246,9 +248,14 @@ process trycycler_subsample {
   cpus params.maxcpus
   //errorStrategy 'ignore' // because this will attempt to subsample even when there aren't enough reads
 
-  input:
-  tuple val(sample), file(fastq) from filtered_fastq_subsample
+  when:
+  params.phase2 == false
 
+  input:
+  set val(sample), file(fastq) from filtered_fastq_subsample
+
+
+  // TODO : remove genome_size and canu from path
   output:
   tuple sample, env(genome_size), file("${task.process}/${sample}/canu/sample*.fastq") into subsampled_canu_fastq
   tuple sample, file("${task.process}/${sample}/flye/sample*fastq") into subsampled_flye_fastq
@@ -285,19 +292,26 @@ process flye {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   echo false
-  cpus params.maxcpus
+  cpus params.medcpus
   container 'staphb/flye:latest'
 
   input:
-  tuple val(sample), file(fastq) from subsampled_flye_fastq
+  set val(sample), file(fastq) from subsampled_flye_fastq
 
   output:
-  tuple sample, file("${task.process}/${sample}_flye.fa") into flye_fastas
+  tuple sample, file("${task.process}/${sample}/*_flye.fasta") into flye_fastas
+  file("${task.process}/${sample}/*/{assembly_graph.gfa,assembly_graph.gv,assembly_info.txt,flye.log,params.json}")
+  file("${task.process}/${sample}/*/00-assembly/draft_assembly.fasta")
+  file("${task.process}/${sample}/*/10-consensus/{chunks.fasta.fai,consensus.fasta}")
+  file("${task.process}/${sample}/*/20-repeat/*")
+  file("${task.process}/${sample}/*/22-plasmids/*")
+  file("${task.process}/${sample}/*/30-contigger/*")
+  file("${task.process}/${sample}/*/40-polishing/*")
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -308,55 +322,93 @@ process flye {
     for fastq in !{fastq}
     do
       name=$(echo $fastq | sed 's/.fastq//g')
+      mkdir -p !{task.process}/!{sample}/$name
       flye !{params.flye_options} \
         --nano-raw $fastq \
         --threads !{task.cpus} \
         --plasmids \
-        --out-dir !{task.process}/!{sample} \
+        --out-dir !{task.process}/!{sample}/$name \
         2>> $err_file >> $log_file
 
-        mv !{task.process}/!{sample}/assembly.fasta !{task.process}/!{sample}/${name}_!{task.process}.fasta
+        cp !{task.process}/!{sample}/$name/assembly.fasta !{task.process}/!{sample}/${name}_!{task.process}.fasta
     done
-
-    exit 1
   '''
 }
 
-// params.miniasm_and_minipolish_options = ''
-// process miniasm_and_minipolish {
-//   publishDir "${params.outdir}", mode: 'copy'
-//   tag "${sample}"
-//   echo false
-//   cpus 4
-//
-//   input:
-//   tuple val(sample), file(fastq) from subsampled_miniasm_fastq
-//
-//   output:
-//   tuple sample, file("${task.process}/${sample}_flye.fa") into miniasm_fastas
-//   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-//
-//   shell:
-//   '''
-//     mkdir -p !{task.process} logs/!{task.process}
-//     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-//     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-//
-//     # time stamp + capturing tool versions
-//     date | tee -a $log_file $err_file > /dev/null
-//     miniasm_and_minipolish.sh --version 2>> $err_file >> $log_file
-//
-//     miniasm_and_minipolish.sh \
-//       !{fastq} \
-//       !{task.cpus} \
-//       > assembly_02.gfa
-//
-//     any2fasta assembly_02.gfa > assemblies/assembly_02.fasta
-//     rm assembly_02.gfa
-//   '''
-// }
+params.miniasm_and_minipolish_options = ''
+process miniasm_and_minipolish {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "${sample}"
+  echo false
+  cpus params.medcpus
+  //container 'staphb/minipolish:latest'
 
-//miniasm_and_minipolish.sh read_subsets/sample_02.fastq "$threads" > assembly_02.gfa && any2fasta assembly_02.gfa > assemblies/assembly_02.fasta && rm assembly_02.gfa
+  // TODO get rid of genome_size and canu
+  input:
+  set val(sample), val(genome_size), file(fastq) from subsampled_canu_fastq
+
+  output:
+  tuple sample, file("${task.process}/${sample}/*gfa") into miniasm_gfa
+  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+
+  shell:
+  '''
+    mkdir -p !{task.process}/!{sample} logs/!{task.process}
+    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+
+    # time stamp + capturing tool versions
+    date | tee -a $log_file $err_file > /dev/null
+    echo "miniasm version : $(miniasm -V)" 2>> $err_file >> $log_file
+    miniasm_and_minipolish.sh --version 2>> $err_file >> $log_file
+
+    for fastq in !{fastq}
+    do
+      name=$(echo $fastq | sed 's/.fastq//g')
+      miniasm_and_minipolish.sh \
+        $fastq \
+        !{task.cpus} \
+        2>> $err_file \
+        > !{task.process}/!{sample}/$name.gfa
+    done
+  '''
+}
+
+params.any2fasta_options = ''
+process any2fasta {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "${sample}"
+  echo false
+  cpus 1
+  //container 'staphb/any2fasta:latest'
+
+  input:
+  tuple val(sample), file(gfa) from miniasm_gfa
+
+  output:
+  tuple sample, file("${task.process}/${sample}/*_miniasm.fasta") into miniasm_fastas
+  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+
+  shell:
+  '''
+    mkdir -p !{task.process}/!{sample} logs/!{task.process}
+    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+
+    # time stamp + capturing tool versions
+    date | tee -a $log_file $err_file > /dev/null
+    any2fasta -v 2>> $err_file >> $log_file
+
+    for gfa in !{gfa}
+    do
+      name=$(echo $gfa | sed 's/.gfa//g')
+      any2fasta !{params.any2fasta_options} \
+        $gfa \
+        2>> $err_file \
+        > !{task.process}/!{sample}/${name}_miniasm.fasta
+    done
+  '''
+}
 
 params.raven_options = ''
 params.raven_polishing_rounds = '2'
@@ -365,10 +417,10 @@ process raven {
   tag "${sample}"
   echo false
   cpus params.medcpus
-  //container 'docker://quay.io/biocontainers/raven-assembler:1.5.1'
+  container 'staphb/raven:latest'
 
   input:
-  tuple val(sample), file(fastq) from subsampled_raven_fastq
+  set val(sample), file(fastq) from subsampled_raven_fastq
 
   output:
   tuple sample, file("${task.process}/${sample}/*.fasta") into raven_fastas
@@ -399,53 +451,52 @@ process raven {
   '''
 }
 
-params.canu_options = ''
-process canu {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo false
-  cpus params.maxcpus
-  container 'staphb/canu:latest'
+// params.canu_options = '-fast'
+// process canu {
+//   publishDir "${params.outdir}", mode: 'copy'
+//   tag "${sample}"
+//   echo false
+//   cpus params.medcpus
+//   container 'staphb/canu:latest'
+//
+//   input:
+//   tuple val(sample), val(genome_size), file(fastq) from subsampled_canu_fastq
+//
+//   output:
+//   tuple sample, file("${task.process}/${sample}_canu.fa") into canu_fastas
+//   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+//
+//   shell:
+//   '''
+//     mkdir -p !{task.process} logs/!{task.process}
+//     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
+//     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+//
+//     # time stamp + capturing tool versions
+//     date | tee -a $log_file $err_file > /dev/null
+//     canu --version 2>> $err_file >> $log_file
+//
+//     echo "Genome size used : " !{genome_size} >> $log_file
+//
+//     for fastq in !{fastq}
+//     do
+//       name=$(echo $fastq | sed 's/.fastq//g')
+//       canu !{params.canu_options} \
+//        -p ${name}_!{task.process} \
+//        -d !{task.process}/!{sample}  \
+//        genomeSize=!{genome_size} \
+//        -nanopore $fastq |
+//        2>> $err_file >> $log_file
+//     done
+//
+//     exit 1
+//   '''
+// }
 
-  input:
-  tuple val(sample), val(genome_size), file(fastq) from subsampled_canu_fastq
-
-  output:
-  tuple sample, file("${task.process}/${sample}_canu.fa") into canu_fastas
-  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    canu --version 2>> $err_file >> $log_file
-
-    echo "Genome size used : " !{genome_size} >> $log_file
-
-    for fastq in !{fastq}
-    do
-      name=$(echo $fastq | sed 's/.fastq//g')
-      canu !{params.canu_options} \
-       -p ${name}_!{task.process} \
-       -d !{task.process}/!{sample}  \
-       genomeSize=!{genome_size} \
-       -nanopore $fastq |
-       2>> $err_file >> $log_file
-    done
-
-    exit 1
-  '''
-}
-
-canu_fastas
+miniasm_fastas
   .join(flye_fastas, by: 0)
   .join(raven_fastas, by: 0)
   .join(filtered_fastq_cluster, by:0)
-  .view()
   .set {assembled_fastas}
 
 params.trycycler_cluster_options = ""
@@ -453,18 +504,23 @@ process trycycler_cluster {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   echo false
-  cpus params.maxcpus
+  cpus params.medcpus
+//  container 'staphb/trycycler:latest'
+
+  when:
+  params.phase2 == false
 
   input:
-  tuple val(sample), file(fasta) from assembled_fastas
+  set val(sample), file(miniasm), file(flye), file(raven), file(fastq) from assembled_fastas
 
   output:
-  file("contigs/newick")
+  file("${task.process}/${sample}/contigs.{newick,phylip}")
+  file("${task.process}/${sample}/cluster*/*contigs/*.fasta")
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p !{task.process}/!{sample} logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -474,33 +530,36 @@ process trycycler_cluster {
 
     trycycler cluster !{params.trycycler_cluster_options} \
       --threads !{task.cpus} \
-      --assemblies assemblies/*.fasta \
+      --assemblies *.fasta \
       --reads !{fastq} \
-      -out_dir !{task.process} \
+      --out_dir !{task.process}/!{sample} \
       2>> $err_file >> $log_file
-
-    exit 1
   '''
 }
 
+
+// TODO : move to before intermission
 params.trycycler_dotplot_options = ''
 process trycycler_dotplot {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  publishDir "${params.outdir}/phase2", mode: 'copy', pattern: '*dotplots.png'
   tag "${cluster}"
   echo false
   cpus 1
-  //  container 'staphb/trycycler:latest'
+  // errorStrategy 'finish'
+  // container 'staphb/trycycler:latest'
 
   input:
   path(cluster) from clusters_dotplot
 
   output:
-  tuple env(cluster), file("${task.process}/*.fastq.gz") into dotplots
+  tuple env(sample), path(cluster) into dotplots
+  file("${cluster}/*/dotplots.png")
   file("logs/${task.process}/${cluster}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{cluster}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{cluster}.!{workflow.sessionId}.err
 
@@ -508,40 +567,45 @@ process trycycler_dotplot {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    cluster=!{cluster}
+    sample=!{cluster}
 
-    trycycler dotplot !{params.trycycler_dotplot_options} \
-      --cluster_dir !{cluster} \
-      2>> $err_file >> $log_file
-
-    exit 1
+    for cluster in $(ls !{cluster}/cluster* -d )
+    do
+      name=$(echo $cluster | cut -f 2 -d "/")
+      trycycler dotplot !{params.trycycler_dotplot_options} \
+        --cluster_dir $cluster \
+        2>> $err_file >> $log_file
+    done
   '''
 }
 
 dotplots
-  .join(clusters_reconcile, by:0)
   .join(filtered_fastq_reconcile, by: 0)
-  .view()
   .set{for_reconcile}
 
+params.trycycler_reconcile_options = ''
+params.trycycler_reconcile_minimum = '2'
 process trycycler_reconcile {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  publishDir "${params.outdir}/phase2/${sample}", mode: 'copy', pattern: '*2_all_seqs.fasta'
   tag "${sample}"
-  echo false
-  cpus 1
-  //  container 'staphb/trycycler:latest'
+  echo true
+  cpus params.medcpus
+  //errorStrategy 'finish'
+  //container 'staphb/trycycler:latest'
 
   input:
-  tuple val(sample), file(dotplots), path(cluster), file(fastq) from for_reconcile
+  set val(sample), path(cluster), file(fastq) from for_reconcile
 
   output:
-  tuple sample, file("${task.process}/*.fasta") into reconciled_fastas_msa
-  tuple sample, file("${task.process}/*.fasta"), fastq into reconciled_fastas_partition
+  tuple sample, path("${task.process}/${sample}") into reconciled_fastas_msa
+  tuple sample, path("${task.process}/${sample}") into reconciled_fastas_partition
+  file("trycycler_reconcile/${sample}/*/2_all_seqs.fasta")
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p !{task.process}/!{cluster} logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -549,34 +613,61 @@ process trycycler_reconcile {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    trycycler reconcile \
-      --reads !{fastq} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
+    rsync -rh !{cluster}/ !{task.process}/!{cluster}/.
+    err_flag=''
 
-    exit 1
+    for cluster in $(ls !{task.process}/!{cluster}/cluster* -d )
+    do
+      num_fasta=$(ls $cluster/1_contigs/*.fasta | wc -l)
+      if [ "$num_fasta" -lt "!{params.trycycler_reconcile_minimum}" ]
+      then
+        rm -rf $cluster
+      else
+        trycycler reconcile !{params.trycycler_reconcile_options} \
+          --reads !{fastq} \
+          --cluster_dir $cluster \
+          --threads !{task.cpus} \
+          2>> $cluster.err >> $log_file
+
+        if [ -f "$cluster/2_all_seqs.fasta" ]
+        then
+          cat $cluster.err >> $err_file
+        else
+          err_flag='1'
+          echo "User input required:"
+          grep Error -A 2 $cluster.err
+          cat $cluster.err >> $err_file
+        fi
+        rm $cluster.err
+      fi
+    done
+
+    if [ -n "$err_flag" ]
+    then
+      exit 1
+    fi
   '''
 }
 
 params.trycycler_msa_options = ''
 process trycycler_msa {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*3_msa.fasta'
   tag "${sample}"
   echo false
-  cpus 1
-  //  container 'staphb/trycycler:latest'
+  cpus params.medcpus
+  //container 'staphb/trycycler:latest'
 
   input:
-  tuple val(sample), file(fasta) from reconciled_fastas_msa
+  set val(sample), path(cluster) from reconciled_fastas_msa
 
   output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into msa
+  tuple sample, path(cluster) into msa
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -584,33 +675,39 @@ process trycycler_msa {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    trycycler msa !{params.trycycler_msa_options} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-      exit 1
+    for cluster in $(ls !{cluster}/cluster* -d )
+    do
+      trycycler msa !{params.trycycler_msa_options} \
+        --cluster_dir $cluster \
+        --threads !{task.cpus} \
+        2>> $err_file >> $log_file
+    done
   '''
 }
+
+msa
+  .join(filtered_fastq_partician, by: 0)
+  .set{ for_partition }
 
 params.trycycler_partition_options = ''
 process trycycler_partition {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*4_reads.fastq'
   tag "${sample}"
   echo false
-  cpus 1
-  //  container 'staphb/trycycler:latest'
+  cpus params.medcpus
+  //container 'staphb/trycycler:latest'
 
   input:
-  tuple val(sample), file(fasta), file(fastq) from reconciled_fastas_partition
+  set val(sample), path(cluster), file(fastq) from for_partition
 
   output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into partition
+  tuple sample, path(cluster) into partition
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -618,34 +715,32 @@ process trycycler_partition {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    trycycler partition !{trycycler_partition_options} \
-      --reads !{fastq} \
-      --cluster_dirs !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    exit 1
+    for cluster in $(ls !{cluster}/cluster* -d )
+    do
+      trycycler partition !{params.trycycler_partition_options} \
+        --reads !{fastq} \
+        --cluster_dirs $cluster \
+        --threads !{task.cpus} \
+        2>> $err_file >> $log_file
+    done
   '''
 }
 
-partition
-  .join(msa, by: 0)
-  .view()
-  .set {for_consensus}
-
 params.trycycler_consensus_options = ''
 process trycycler_consensus {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*7_final_consensus.fasta'
+  publishDir "${params.outdir}", mode: 'copy', pattern: 'final_consensus.fasta'
   tag "${sample}"
   echo false
-  cpus 1
-  //  container 'staphb/trycycler:latest'
+  cpus params.medcpus
+  //container 'staphb/trycycler:latest'
 
   input:
-  tuple val(sample), file(fasta), file(fastq) from for_consensus
+  set val(sample), path(cluster) from partition
 
   output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into consensus
+  tuple sample, path(cluster) into consensus
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -658,12 +753,15 @@ process trycycler_consensus {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    trycycler consensus !{params.trycycler_consensus_options} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
+    for cluster in $(ls !{cluster}/cluster* -d )
+    do
+      trycycler consensus !{params.trycycler_consensus_options} \
+        --cluster_dir $cluster \
+        --threads !{task.cpus} \
+        2>> $err_file >> $log_file
+    done
 
-    exit 1
+    cat !{cluster}/cluster_*/7_final_consensus.fasta > !{cluster}/!{cluster}_consensus.fasta
   '''
 }
 
@@ -673,13 +771,13 @@ process medaka {
   tag "${sample}"
   echo false
   cpus 1
-  //  container 'staphb/trycycler:latest'
+  container 'staphb/medaka:latest'
 
   input:
-  tuple val(sample), file(fasta), file(fastq) from consensus
+  set val(sample), path(cluster) from consensus
 
   output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into medaka_fastas
+  tuple sample, file("${task.process}/${cluster}_consensus.fasta") into medaka_fastas, medaka_fastas_pilon
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -692,7 +790,16 @@ process medaka {
     date | tee -a $log_file $err_file > /dev/null
     medaka --version >> $log_file
 
-    exit 1
+    for cluster in $(ls !{cluster}/cluster* -d )
+    do
+      medaka_consensus !{params.medaka_options} \
+        -i $cluster/4_reads.fastq \
+        -d $cluster/7_final_consensus.fasta \
+        -o $cluster/medaka \
+        -t !{task.cpus}
+    done
+
+    cat !{cluster}/cluster_*/medaka/*fasta > !{task.process}/!{cluster}_consensus.fasta
   '''
 }
 
@@ -700,30 +807,30 @@ if (params.illumina) {
   params.fastp_options = ''
   process fastp {
     publishDir "${params.outdir}", mode: 'copy'
-    tag "${fastq}"
+    tag "${name}"
     echo false
     cpus 1
-    //  container 'staphb/trycycler:latest'
+    container 'bromberglab/fastp:latest'
 
     input:
-    file(fastq), file(sample_key) from illumina_fastq
+    set val(name), file(fastq), file(sample_key) from illumina_fastqs
 
     output:
     tuple env(sample), file("${task.process}/*{R1,R2}.fastq.gz"), file("${task.process}/*u.fastq.gz") into clean_reads
     file("${task.process}/*.u.fastq.gz")
-    file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+    file("logs/${task.process}/${name}.${workflow.sessionId}.{log,err}")
 
     shell:
     '''
       mkdir -p !{task.process} logs/!{task.process}
-      log_file=logs/!{task.process}/!{fastq}.!{workflow.sessionId}.log
-      err_file=logs/!{task.process}/!{fastq}.!{workflow.sessionId}.err
+      log_file=logs/!{task.process}/!{name}.!{workflow.sessionId}.log
+      err_file=logs/!{task.process}/!{name}.!{workflow.sessionId}.err
 
       # time stamp + capturing tool versions
       date | tee -a $log_file $err_file > /dev/null
       fastp --version >> $log_file
 
-      sample=$(grep -e !{fastq[0]} -e !{fastq[1]} !{sample_key} | cut -f 2 -c "," | head -n 1)
+      sample=$(grep -e !{fastq[0]} -e !{fastq[1]} !{sample_key} | cut -f 2 -d "," | head -n 1 )
 
       fastp !{params.fastp_options} \
         --in1 !{fastq[0]} \
@@ -732,8 +839,6 @@ if (params.illumina) {
         --out2 !{task.process}/${sample}_R2.fastq.gz \
         --unpaired1 !{task.process}/$sample.u.fastq.gz \
         --unpaired2 !{task.process}/$sample.u.fastq.gz
-
-      exit 1
     '''
   }
 
@@ -742,6 +847,7 @@ if (params.illumina) {
     .view()
     .set {for_bwa}
 
+  params.bwa_options = ''
   process bwa {
     publishDir "${params.outdir}", mode: 'copy', pattern: "logs/bwa/*.{log,err}"
     tag "${sample}"
@@ -753,7 +859,7 @@ if (params.illumina) {
     set val(sample), file(reference_genome), file(reads), file(unpaired) from for_bwa
 
     output:
-    tuple sample, file("${task.process}/${sample}.sam"), file("${task.process}/${sample}_unpaired.sam") into bwa_sams
+    tuple sample, file("${task.process}/${sample}.sam"), file("${task.process}/${sample}_unpaired.sam") into sams
     file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
     shell:
@@ -771,8 +877,8 @@ if (params.illumina) {
       bwa index !{reference_genome}
 
       # bwa mem command
-      bwa mem -t !{task.cpus} !{reference_genome} !{reads[0]} !{reads[2]} 2>> $err_file > !{task.process}/!{sample}.sam
-      bwa mem -t !{task.cpus} !{reference_genome} !{unpaired} 2>> $err_file > !{task.process}/!{sample}_unpaired.sam
+      bwa mem !{params.bwa_options} -t !{task.cpus} !{reference_genome} !{reads[0]} !{reads[2]} 2>> $err_file > !{task.process}/!{sample}.sam
+      bwa mem !{params.bwa_options} -t !{task.cpus} !{reference_genome} !{unpaired} 2>> $err_file > !{task.process}/!{sample}_unpaired.sam
     '''
   }
 
@@ -805,12 +911,11 @@ if (params.illumina) {
 
       samtools sort -@ !{task.cpus} !{unpaired_sam} 2>> $err_file | \
         samtools view -F 4 -o !{task.process}/!{sample}_unpaired.sorted.bam --write-index 2>> $err_file >> $log_file
-
     '''
   }
 
   bams
-    .join(medaka_fastas, by:0)
+    .join(medaka_fastas_pilon, by:0)
     .set{ for_pilon }
 
   params.pilon_options = ''
@@ -819,13 +924,13 @@ if (params.illumina) {
     tag "${sample}"
     echo false
     cpus 1
-    //  container 'staphb/trycycler:latest'
+    container 'staphb/pilon:latest'
 
     input:
-    tuple val(sample), file(bam), file(unpaired_bam), file(fasta) from for_pilon
+    set val(sample), file(bam), file(unpaired_bam), file(fasta) from for_pilon
 
     output:
-    tuple env(sample), file("${task.process}/*.fastq.gz")
+    tuple sample, file("${task.process}/*.fastq.gz")
     file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
     shell:
@@ -851,7 +956,7 @@ if (params.illumina) {
 
 if ( params.phase2 ) {
   workflow.onComplete {
-      println("Donuf Falls completed at: $workflow.complete")
+      println("Donut Falls completed at: $workflow.complete")
       println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
   }
 } else {
