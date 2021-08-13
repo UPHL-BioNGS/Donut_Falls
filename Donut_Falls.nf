@@ -9,7 +9,7 @@ println("")
 params.outdir = workflow.launchDir + '/donut_falls'
 
 params.maxcpus = Runtime.runtime.availableProcessors()
-println("The maximum number of CPUS used in this workflow is ${params.maxcpus}")
+println("Maximum number of CPUS used in this workflow : ${params.maxcpus}")
 if ( params.maxcpus < 12 ) {
   params.medcpus = params.maxcpus
 } else {
@@ -20,6 +20,7 @@ params.sample_key = workflow.launchDir + '/sample_key.csv'
 if (params.sample_key.exists()) {
   Channel
     .fromPath(params.sample_key, type:'file')
+    .view { "File for linking files to identifiers : $it" }
     .into{sample_key ; sample_key_illumina}
 } else {
   sample_key = Channel.empty()
@@ -56,7 +57,7 @@ if (params.sample_key.exists()) {
 params.fastq_pass = true
 if ( params.fastq_pass ) {
   params.fastq_pass_directory = workflow.launchDir + '/fastq_pass'
-  println("Directory for fastq pass files:" + params.fastq_pass_directory)
+  println("Fastq pass directory from nanopore sequencing run : " + params.fastq_pass_directory)
 
   if ( params.sample_key.exists() ) {
     Channel
@@ -65,6 +66,7 @@ if ( params.fastq_pass ) {
         println("Could not find 'fastq_pass' directories. Set with 'params.fastq_pass_directory'")
         exit 1
       }
+      .view { "Directories identified : $it" }
       .combine(sample_key)
       .set { fastq_pass_directory }
     } else {
@@ -87,12 +89,11 @@ if ( params.phase2 ) {
   println("Beginning second phase of workflow.")
   Channel
     .fromPath("${params.cluster_directory}/*", type:'dir')
-    .view { "Samples with clusters to reconcile : $it" }
-    .into { clusters_dotplot ; clusters_reconcile }
+    .map { it -> tuple(it.getName(), it ) }
+    .view { "Samples with clusters to reconcile : ${it[0]}" }
+    .set { clusters }
 } else {
-  Channel
-    .empty()
-    .into { clusters_dotplot ; clusters_reconcile }
+  clusters = Channel.empty()
 }
 
 params.illumina = false
@@ -106,7 +107,7 @@ if ( params.phase2 && params.illumina ) {
       exit 1
     }
     .combine(sample_key_illumina)
-    .view()
+    .view {"Illumina fastq files for pilon polishing : ${it[0]}"}
     .set { illumina_fastqs }
 } else {
   illumina_fastqs = Channel.empty()
@@ -501,7 +502,8 @@ miniasm_fastas
 
 params.trycycler_cluster_options = ""
 process trycycler_cluster {
-  publishDir "${params.outdir}", mode: 'copy'
+  publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
+  //publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   echo false
   cpus params.medcpus
@@ -516,6 +518,7 @@ process trycycler_cluster {
   output:
   file("${task.process}/${sample}/contigs.{newick,phylip}")
   file("${task.process}/${sample}/cluster*/*contigs/*.fasta")
+  tuple sample, path("${task.process}/${sample}") into inital_clusters
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -537,7 +540,6 @@ process trycycler_cluster {
   '''
 }
 
-
 // TODO : move to before intermission
 params.trycycler_dotplot_options = ''
 process trycycler_dotplot {
@@ -550,11 +552,10 @@ process trycycler_dotplot {
   // container 'staphb/trycycler:latest'
 
   input:
-  path(cluster) from clusters_dotplot
+  set val(sample), path(cluster) from inital_clusters
 
   output:
-  tuple env(sample), path(cluster) into dotplots
-  file("${cluster}/*/dotplots.png")
+  path("${cluster}/*/dotplots.png")
   file("logs/${task.process}/${cluster}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -567,8 +568,6 @@ process trycycler_dotplot {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    sample=!{cluster}
-
     for cluster in $(ls !{cluster}/cluster* -d )
     do
       name=$(echo $cluster | cut -f 2 -d "/")
@@ -579,7 +578,7 @@ process trycycler_dotplot {
   '''
 }
 
-dotplots
+clusters
   .join(filtered_fastq_reconcile, by: 0)
   .set{for_reconcile}
 
@@ -587,7 +586,7 @@ params.trycycler_reconcile_options = ''
 params.trycycler_reconcile_minimum = '2'
 process trycycler_reconcile {
   publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
-  publishDir "${params.outdir}/phase2/${sample}", mode: 'copy', pattern: '*2_all_seqs.fasta'
+  //publishDir "${params.outdir}/phase2/${sample}", mode: 'copy', pattern: '*2_all_seqs.fasta'
   tag "${sample}"
   echo true
   cpus params.medcpus
@@ -598,8 +597,7 @@ process trycycler_reconcile {
   set val(sample), path(cluster), file(fastq) from for_reconcile
 
   output:
-  tuple sample, path("${task.process}/${sample}") into reconciled_fastas_msa
-  tuple sample, path("${task.process}/${sample}") into reconciled_fastas_partition
+  tuple sample, path("${task.process}/${sample}/*") into reconciled_fastas
   file("trycycler_reconcile/${sample}/*/2_all_seqs.fasta")
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
@@ -649,20 +647,24 @@ process trycycler_reconcile {
   '''
 }
 
+reconciled_fastas
+  .transpose()
+  .filter( it -> it[1] =~ /cluster/ )
+  .set { reconciled_fastas_cluster }
+
 params.trycycler_msa_options = ''
 process trycycler_msa {
   publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
-  publishDir "${params.outdir}", mode: 'copy', pattern: '*3_msa.fasta'
-  tag "${sample}"
+  tag "${sample}_${trycycler}"
   echo false
   cpus params.medcpus
   //container 'staphb/trycycler:latest'
 
   input:
-  set val(sample), path(cluster) from reconciled_fastas_msa
+  set val(sample), path(trycycler) from reconciled_fastas_cluster
 
   output:
-  tuple sample, path(cluster) into msa
+  tuple sample, env(cluster), path(trycycler) into msa
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -675,34 +677,32 @@ process trycycler_msa {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    for cluster in $(ls !{cluster}/cluster* -d )
-    do
-      trycycler msa !{params.trycycler_msa_options} \
-        --cluster_dir $cluster \
-        --threads !{task.cpus} \
-        2>> $err_file >> $log_file
-    done
+    cluster=!{trycycler}
+
+    trycycler msa !{params.trycycler_msa_options} \
+      --cluster_dir !{trycycler} \
+      --threads !{task.cpus} \
+      2>> $err_file >> $log_file
   '''
 }
 
 msa
-  .join(filtered_fastq_partician, by: 0)
+  .combine(filtered_fastq_partician, by: 0)
   .set{ for_partition }
 
 params.trycycler_partition_options = ''
 process trycycler_partition {
   publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
-  publishDir "${params.outdir}", mode: 'copy', pattern: '*4_reads.fastq'
-  tag "${sample}"
+  tag "${sample}_${cluster}"
   echo false
   cpus params.medcpus
   //container 'staphb/trycycler:latest'
 
   input:
-  set val(sample), path(cluster), file(fastq) from for_partition
+  set val(sample), val(cluster), path(trycycler), file(fastq) from for_partition
 
   output:
-  tuple sample, path(cluster) into partition
+  tuple sample, cluster, path(trycycler) into partition
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -715,14 +715,11 @@ process trycycler_partition {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    for cluster in $(ls !{cluster}/cluster* -d )
-    do
-      trycycler partition !{params.trycycler_partition_options} \
-        --reads !{fastq} \
-        --cluster_dirs $cluster \
-        --threads !{task.cpus} \
-        2>> $err_file >> $log_file
-    done
+    trycycler partition !{params.trycycler_partition_options} \
+      --reads !{fastq} \
+      --cluster_dirs !{trycycler} \
+      --threads !{task.cpus} \
+      2>> $err_file >> $log_file
   '''
 }
 
@@ -731,21 +728,22 @@ process trycycler_consensus {
   publishDir "${params.outdir}", mode: 'copy', pattern: '*.{log,err}'
   publishDir "${params.outdir}", mode: 'copy', pattern: '*7_final_consensus.fasta'
   publishDir "${params.outdir}", mode: 'copy', pattern: 'final_consensus.fasta'
-  tag "${sample}"
+  tag "${sample}_${cluster}"
   echo false
   cpus params.medcpus
   //container 'staphb/trycycler:latest'
 
   input:
-  set val(sample), path(cluster) from partition
+  set val(sample), val(cluster), path(trycycler) from partition
 
   output:
-  tuple sample, path(cluster) into consensus
+  tuple sample, cluster, path(trycycler) into consensus
+  file("${trycycler}/${sample}_${cluster}_trycycler_consensus.fasta") into consensus_all
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -753,36 +751,60 @@ process trycycler_consensus {
     date | tee -a $log_file $err_file > /dev/null
     trycycler --version >> $log_file
 
-    for cluster in $(ls !{cluster}/cluster* -d )
-    do
-      trycycler consensus !{params.trycycler_consensus_options} \
-        --cluster_dir $cluster \
-        --threads !{task.cpus} \
-        2>> $err_file >> $log_file
-    done
+    trycycler consensus !{params.trycycler_consensus_options} \
+      --cluster_dir !{trycycler} \
+      --threads !{task.cpus} \
+      2>> $err_file >> $log_file
 
-    cat !{cluster}/cluster_*/7_final_consensus.fasta > !{cluster}/!{cluster}_consensus.fasta
+    cp !{trycycler}/7_final_consensus.fasta !{trycycler}/!{sample}_!{cluster}_trycycler_consensus.fasta
+  '''
+}
+
+process trycycler_combine_consensus {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "combine all"
+  echo false
+  cpus 1
+  //container 'staphb/trycycler:latest'
+
+  input:
+  file(consensus) from consensus_all.collect()
+
+  output:
+  file("${task.process}/*_trycycler_consensus.fasta")
+
+  shell:
+  '''
+    mkdir !{task.process}
+
+    for sample in $(ls *fasta | sed 's/_cluster.*//g' | sort | uniq)
+    do
+      cat $sample*fasta > !{task.process}/${sample}_trycycler_consensus.fasta
+    done
   '''
 }
 
 params.medaka_options = ''
 process medaka {
   publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
+  tag "${sample}_${cluster}"
   echo false
   cpus 1
   container 'staphb/medaka:latest'
 
   input:
-  set val(sample), path(cluster) from consensus
+  set val(sample), val(cluster), path(trycycler) from consensus
 
   output:
-  tuple sample, file("${task.process}/${cluster}_consensus.fasta") into medaka_fastas, medaka_fastas_pilon
+  path(trycycler)
+  file("${trycycler}/${sample}_${cluster}_medaka_consensus.fasta") into medaka_fastas_all
+  tuple sample, cluster, file("${trycycler}/7_final_consensus.fasta") into medaka_fastas, medaka_fastas2
+  tuple env(sample_cluster), file("${trycycler}/7_final_consensus.fasta") into medaka_fastas_pilon
   file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p logs/!{task.process}
     log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
 
@@ -790,16 +812,38 @@ process medaka {
     date | tee -a $log_file $err_file > /dev/null
     medaka --version >> $log_file
 
-    for cluster in $(ls !{cluster}/cluster* -d )
-    do
-      medaka_consensus !{params.medaka_options} \
-        -i $cluster/4_reads.fastq \
-        -d $cluster/7_final_consensus.fasta \
-        -o $cluster/medaka \
-        -t !{task.cpus}
-    done
+    sample_cluster="!{sample}_!{cluster}"
 
-    cat !{cluster}/cluster_*/medaka/*fasta > !{task.process}/!{cluster}_consensus.fasta
+    medaka_consensus !{params.medaka_options} \
+      -i !{trycycler}/4_reads.fastq \
+      -d !{trycycler}/7_final_consensus.fasta \
+      -o !{trycycler}/medaka \
+      -t !{task.cpus}
+
+    cp !{trycycler}/7_final_consensus.fasta !{trycycler}/!{sample}_!{cluster}_medaka_consensus.fasta
+  '''
+}
+
+process medaka_combine_consensus {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "combine all"
+  echo false
+  cpus 1
+  //container 'staphb/medaka:latest'
+
+  input:
+  file(consensus) from medaka_fastas_all.collect()
+
+  output:
+  file("${task.process}/*_medaka_consensus.fasta")
+
+  shell:
+  '''
+    mkdir !{task.process}
+    for sample in $(ls *fasta | sed 's/_cluster_.*//g' | sort | uniq)
+    do
+      cat $sample*fasta > !{task.process}/${sample}_medaka_consensus.fasta
+    done
   '''
 }
 
@@ -816,8 +860,8 @@ if (params.illumina) {
     set val(name), file(fastq), file(sample_key) from illumina_fastqs
 
     output:
-    tuple env(sample), file("${task.process}/*{R1,R2}.fastq.gz"), file("${task.process}/*u.fastq.gz") into clean_reads
-    file("${task.process}/*.u.fastq.gz")
+    tuple env(sample), file("${task.process}/*{R1,R2}.fastq.gz") into paired_clean_reads
+    tuple env(sample), file("${task.process}/*u.fastq.gz") into unpaired_clean_reads
     file("logs/${task.process}/${name}.${workflow.sessionId}.{log,err}")
 
     shell:
@@ -842,31 +886,34 @@ if (params.illumina) {
     '''
   }
 
-  medaka_fastas
-    .join(clean_reads, by: 0)
-    .view()
-    .set {for_bwa}
+  paired_clean_reads
+    .combine(medaka_fastas, by: 0)
+    .set{ for_bwa }
+
+  unpaired_clean_reads
+    .combine(medaka_fastas2, by: 0)
+    .set{ for_unpaired_bwa }
 
   params.bwa_options = ''
   process bwa {
     publishDir "${params.outdir}", mode: 'copy', pattern: "logs/bwa/*.{log,err}"
-    tag "${sample}"
+    tag "${sample}_${cluster}"
     echo false
     cpus params.maxcpus
     container 'staphb/bwa:latest'
 
     input:
-    set val(sample), file(reference_genome), file(reads), file(unpaired) from for_bwa
+    set val(sample), file(fastq), val(cluster), file(reference_genome) from for_bwa
 
     output:
-    tuple sample, file("${task.process}/${sample}.sam"), file("${task.process}/${sample}_unpaired.sam") into sams
-    file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+    tuple env(sample_cluster), file("${task.process}/${sample}_${cluster}_paired.sam") into paired_sams
+    file("logs/${task.process}/${sample}_${cluster}.${workflow.sessionId}.{log,err}")
 
     shell:
     '''
       mkdir -p !{task.process} logs/!{task.process}
-      log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-      err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+      log_file=logs/!{task.process}/!{sample}_!{cluster}.!{workflow.sessionId}.log
+      err_file=logs/!{task.process}/!{sample}_!{cluster}.!{workflow.sessionId}.err
 
       # time stamp + capturing tool versions
       date | tee -a $log_file $err_file > /dev/null
@@ -876,78 +923,146 @@ if (params.illumina) {
       # index the reference fasta file
       bwa index !{reference_genome}
 
+      sample_cluster="!{sample}_!{cluster}"
+
       # bwa mem command
-      bwa mem !{params.bwa_options} -t !{task.cpus} !{reference_genome} !{reads[0]} !{reads[2]} 2>> $err_file > !{task.process}/!{sample}.sam
-      bwa mem !{params.bwa_options} -t !{task.cpus} !{reference_genome} !{unpaired} 2>> $err_file > !{task.process}/!{sample}_unpaired.sam
+      bwa mem !{params.bwa_options} \
+        -t !{task.cpus} \
+        !{reference_genome} \
+        !{fastq[0]} !{fastq[1]} \
+        2>> $err_file \
+        > !{task.process}/!{sample}_!{cluster}_paired.sam
     '''
   }
 
+  process bwa_unpaired {
+    publishDir "${params.outdir}", mode: 'copy', pattern: "logs/bwa/*.{log,err}"
+    tag "${sample}_${cluster}"
+    echo false
+    cpus params.maxcpus
+    container 'staphb/bwa:latest'
+
+    input:
+    set val(sample), file(fastq), val(cluster), file(reference_genome) from for_unpaired_bwa
+
+    output:
+    tuple env(sample_cluster), file("${task.process}/${sample}_${cluster}_unpaired.sam") into unpaired_sams
+    file("logs/${task.process}/${sample}_${cluster}.${workflow.sessionId}.{log,err}")
+
+    shell:
+    '''
+      mkdir -p !{task.process} logs/!{task.process}
+      log_file=logs/!{task.process}/!{sample}_!{cluster}.!{workflow.sessionId}.log
+      err_file=logs/!{task.process}/!{sample}_!{cluster}.!{workflow.sessionId}.err
+
+      # time stamp + capturing tool versions
+      date | tee -a $log_file $err_file > /dev/null
+      echo "bwa $(bwa 2>&1 | grep Version )" >> $log_file
+      bwa_version="bwa : "$(bwa 2>&1 | grep Version)
+
+      # index the reference fasta file
+      bwa index !{reference_genome}
+
+      sample_cluster="!{sample}_!{cluster}"
+
+      # bwa mem command
+      bwa mem !{params.bwa_options} \
+        -t !{task.cpus} \
+        !{reference_genome} \
+        !{fastq} \
+        2>> $err_file \
+        > !{task.process}/!{sample}_!{cluster}_unpaired.sam
+    '''
+  }
+
+  paired_sams
+    .concat(unpaired_sams)
+    .set{sams}
+
   process sort {
     publishDir "${params.outdir}", mode: 'copy'
-    tag "${sample}"
+    tag "${sample_cluster}"
     echo false
     cpus params.maxcpus
     container 'staphb/samtools:latest'
 
     input:
-    set val(sample), file(sam), file(unpaired_sam) from sams
+    set val(sample_cluster), file(sam) from sams
 
     output:
-    tuple sample, file("!{task.process}/${sample}.sorted{.bam,.bam.bai}"), file("!{task.process}/${sample}_unpaired.sorted{.bam,.bam.bai}") into bams
-    file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+    tuple sample_cluster, file("${task.process}/${sample_cluster}*.bam"), file("${task.process}/${sample_cluster}*.bam.bai") into bams
+    file("logs/${task.process}/${sample_cluster}.${workflow.sessionId}.{log,err}")
 
     shell:
     '''
       mkdir -p !{task.process} logs/!{task.process}
-      log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-      err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+      log_file=logs/!{task.process}/!{sample_cluster}.!{workflow.sessionId}.log
+      err_file=logs/!{task.process}/!{sample_cluster}.!{workflow.sessionId}.err
 
       # time stamp + capturing tool versions
       date | tee -a $log_file $err_file > /dev/null
       samtools --version >> $log_file
 
-      samtools sort -@ !{task.cpus} !{sam} 2>> $err_file | \
-        samtools view -F 4 -o !{task.process}/!{sample}.sorted.bam --write-index 2>> $err_file >> $log_file
+      name=$(echo !{sam} | sed 's/.sam$//g' )
 
-      samtools sort -@ !{task.cpus} !{unpaired_sam} 2>> $err_file | \
-        samtools view -F 4 -o !{task.process}/!{sample}_unpaired.sorted.bam --write-index 2>> $err_file >> $log_file
+      samtools sort -@ !{task.cpus} !{sam} 2>> $err_file | \
+        samtools view -F 4 -o !{task.process}/$name.bam 2>> $err_file >> $log_file
+      samtools index !{task.process}/$name.bam 2>> $err_file >> $log_file
     '''
   }
 
   bams
+    .groupTuple(by: 0)
     .join(medaka_fastas_pilon, by:0)
     .set{ for_pilon }
 
   params.pilon_options = ''
   process pilon {
     publishDir "${params.outdir}", mode: 'copy'
-    tag "${sample}"
-    echo false
+    tag "${sample_cluster}"
+    echo true
     cpus 1
     container 'staphb/pilon:latest'
 
     input:
-    set val(sample), file(bam), file(unpaired_bam), file(fasta) from for_pilon
+    tuple val(sample_cluster), file(bam), file(bai), file(fasta) from for_pilon
 
     output:
-    tuple sample, file("${task.process}/*.fastq.gz")
-    file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+    file("${task.process}/*.fastq.gz")
+    file("logs/${task.process}/${sample_cluster}.${workflow.sessionId}.{log,err}")
 
     shell:
     '''
       mkdir -p !{task.process} logs/!{task.process}
-      log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-      err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+      log_file=logs/!{task.process}/!{sample_cluster}.!{workflow.sessionId}.log
+      err_file=logs/!{task.process}/!{sample_cluster}.!{workflow.sessionId}.err
 
       # time stamp + capturing tool versions
       date | tee -a $log_file $err_file > /dev/null
       pilon --version >> $log_file
 
       round=1
+      flag="1"
+      cp !{fasta} !{task.process}/!{sample_cluster}_0.fasta
+      old_fasta=!{task.process}/!{sample_cluster}_0.fasta
 
-      file=!{sample}_${round}.fasta
+      #while [ $round -lt 4 ]
+      #do
+        new_fasta=!{task.process}/!{sample_cluster}_${round}.fasta
+        pilon !{params.pilon_options} \
+          --genome $old_fasta \
+          --frags !{sample_cluster}_paired.bam \
+          --unpaired !{sample_cluster}_unpaired.bam \
+          --output $new_fasta \
+          --changes \
+          2>> $err_file >> $log_file
 
-      pilon --genome !{fasta} --frags !{bam} --unpaired !{unpaired_bam} --output $file --changes
+        old_fasta=$new_fasta
+        round=$(( $round + 1 ))
+        #wc -l $new_fasta.changes
+      #done
+
+
 
       exit 1
     '''
