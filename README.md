@@ -35,17 +35,18 @@ cat fastq_pass/barcode01/*fastq.gz > reads/sample.fastq.gz
 # Usage
 
 ```
-nextflow run UPHL-BioNGS/Donut_falls -profile singularity --reads <path to reads> --reads reads
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads>
 ```
 
 ## If there are Illumina short - reads that can used for polishing
 
 ```
-nextflow run UPHL-BioNGS/Donut_falls -profile singularity --reads <path to reads> --reads reads --illumina
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads> --illumina <path to illumina reads>
 ```
 
-Illumina reads need to match the same naming convention as the nanopore reads (i.e. 12345.fastq.gz for nanopore 12345_R1.fastq.gz and 12345_R2.fastq.gz for Illumina)
+Illumina reads need to match the same naming convention as the nanopore reads (i.e. `12345.fastq.gz` for nanopore and `12345_R1.fastq.gz` and `12345_R2.fastq.gz` for Illumina)
 
+WARNING : polca/masurca currently must be in path
 
 # Frequently Asked Questions (aka FAQ)
 ### What do I do if I encounter an error?
