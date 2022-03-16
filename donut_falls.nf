@@ -3,7 +3,7 @@
 println("Currently using the Donut Falls workflow for use with nanopore sequencing\n")
 println("Author: Erin Young")
 println("email: eriny@utah.gov")
-println("Version: v.0.20220220")
+println("Version: v.0.20220316")
 println("")
 
 // TODO : Add longQC?
@@ -25,9 +25,12 @@ Channel
   .fromPath(params.sequencing_summary, type:'file')
   .view { "Summary File : $it" }
   .ifEmpty{
+    params.nanoplot = false
     println("Could not find sequencing summary file! Set with 'params.sequencing_summary'")
   }
   .set { sequencing_summary }
+
+if ( params.nanoplot != false ) { params.nanoplot = true }
 
 params.reads = workflow.launchDir + '/reads'
 Channel
@@ -51,7 +54,6 @@ Channel
   .view { "Illumina fastq files for for greater accuracy : ${it[0]}" }
   .into { illumina_fastqs ; illumina_fastqs_polishing }
 
-params.nanoplot = true
 params.nanoplot_options = '--barcoded'
 process nanoplot {
   publishDir "${params.outdir}", mode: 'copy'
@@ -63,7 +65,7 @@ process nanoplot {
   params.nanoplot
 
   input:
-  path(sequencing_summary) from sequencing_summary
+  file(sequencing_summary) from sequencing_summary.view()
 
   output:
   path("${task.process}")
@@ -138,7 +140,7 @@ process filtlong {
   container 'staphb/filtlong:latest'
 
   input:
-  tuple val(sample), path(fastq), path(short_reads) from fastq.join(clean_reads, by:0, remainder : true)
+  tuple val(sample), file(fastq), file(short_reads) from fastq.join(clean_reads, by:0, remainder : true)
 
   output:
   tuple val(sample), path("${task.process}/${sample}_filtered.fastq") optional true into filtlong_fastq
@@ -212,7 +214,7 @@ if ( params.assembler == 'flye' ) {
     tag "${sample}"
     cpus params.medcpus
     container 'staphb/flye:latest'
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
     input:
     tuple val(sample), path(fastq) from filtered_fastq
