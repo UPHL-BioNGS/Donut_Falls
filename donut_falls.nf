@@ -3,12 +3,12 @@
 println("Currently using the Donut Falls workflow for use with nanopore sequencing\n")
 println("Author: Erin Young")
 println("email: eriny@utah.gov")
-println("Version: v.0.20220316")
+println("Version: v.0.0.20220525")
 println("")
 
+// TODO : fix commas in  numbers for summary file
 // TODO : Add longQC?
-// TODO : Add summary file
-// TODO : Add socru?
+// TODO : Add MuliQC?
 
 params.outdir = workflow.launchDir + '/donut_falls'
 
@@ -25,12 +25,10 @@ Channel
   .fromPath(params.sequencing_summary, type:'file')
   .view { "Summary File : $it" }
   .ifEmpty{
-    params.nanoplot = false
+    params.nanoplot_summary = false
     println("Could not find sequencing summary file! Set with 'params.sequencing_summary'")
   }
   .set { sequencing_summary }
-
-if ( params.nanoplot != false ) { params.nanoplot = true }
 
 params.reads = workflow.launchDir + '/reads'
 Channel
@@ -41,9 +39,10 @@ Channel
   }
   .map { reads -> tuple(reads.simpleName, reads ) }
   .view { "Fastq file found : ${it[0]}" }
-  .set { fastq }
+  .into { fastq ; fastq_nanoplot }
 
-params.assembler = 'flye'
+//params.assembler = 'flye'
+params.assembler = 'unicycler'
 //params.assembler = 'raven'
 //params.assembler = 'miniasm'
 
@@ -54,18 +53,19 @@ Channel
   .view { "Illumina fastq files for for greater accuracy : ${it[0]}" }
   .into { illumina_fastqs ; illumina_fastqs_polishing }
 
-params.nanoplot_options = '--barcoded'
-process nanoplot {
+params.nanoplot_summary = true
+params.nanoplot_options = ''
+process nanoplot_summary {
   publishDir "${params.outdir}", mode: 'copy'
   tag "nanoplot"
   cpus params.medcpus
   container 'staphb/nanoplot:latest'
 
   when:
-  params.nanoplot
+  params.nanoplot_summary
 
   input:
-  file(sequencing_summary) from sequencing_summary.view()
+  file(sequencing_summary) from sequencing_summary
 
   output:
   path("${task.process}")
@@ -73,7 +73,7 @@ process nanoplot {
 
   shell:
   '''
-    mkdir -p !{task.process} logs/!{task.process}
+    mkdir -p !{task.process}/basic logs/!{task.process}
     log_file=logs/!{task.process}/!{workflow.sessionId}.log
     err_file=logs/!{task.process}/!{workflow.sessionId}.err
 
@@ -81,12 +81,62 @@ process nanoplot {
     date | tee -a $log_file $err_file > /dev/null
     NanoPlot --version | tee -a $log_file $err_file > /dev/null
 
-    NanoPlot !{params.nanoplot_options} \
+    NanoPlot \
       --summary !{sequencing_summary} \
       --threads !{task.cpus} \
       --outdir !{task.process} \
-      --raw \
       2>> $err_file >> $log_file
+  '''
+}
+
+params.nanoplot = true
+params.nanoplot = ''
+process nanoplot {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "${sample}"
+  cpus params.medcpus
+  container 'staphb/nanoplot:latest'
+
+  when:
+  params.nanoplot
+
+  input:
+  tuple val(sample), file(fastq) from fastq_nanoplot
+
+  output:
+  path("${task.process}/${sample}")
+  tuple sample, env(mnrdlngt) into nanoplot_mean_read_length
+  tuple sample, env(mnrdqual) into nanoplot_mean_read_quality
+  tuple sample, env(mdrdlngt) into nanoplot_median_read_length
+  tuple sample, env(mdrdqual) into nanoplot_median_read_quality
+  tuple sample, env(numreads) into nanoplot_number_of_reads
+  tuple sample, env(rdlenN50) into nanoplot_read_length_N
+  tuple sample, env(totbases) into nanoplot_total_bases
+  path("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+
+  shell:
+  '''
+    mkdir -p !{task.process}/!{sample} logs/!{task.process}
+    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+
+    # time stamp + capturing tool versions
+    date | tee -a $log_file $err_file > /dev/null
+    NanoPlot --version | tee -a $log_file $err_file > /dev/null
+
+    NanoPlot \
+      --fastq !{fastq} \
+      --threads !{task.cpus} \
+      --outdir !{task.process}/!{sample} \
+      2>> $err_file >> $log_file
+
+    mnrdlngt=$(grep "Mean read length:"    !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    mnrdqual=$(grep "Mean read quality:"   !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    mdrdlngt=$(grep "Median read length:"  !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    mdrdqual=$(grep "Median read quality:" !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    numreads=$(grep "Number of reads:"     !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    rdlenN50=$(grep "Read length N50:"     !{task.process}/!{sample}/NanoStats.txt | awk '{print $4 }' )
+    totbases=$(grep "Total bases:"         !{task.process}/!{sample}/NanoStats.txt | awk '{print $3 }' )
   '''
 }
 
@@ -105,7 +155,7 @@ process fastp {
 
   output:
   tuple val(sample), path("${task.process}/${sample}_{R1,R2}.fastq.gz") into clean_reads
-  path("${task.process}")
+  path("${task.process}/*")
   path("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
   shell:
@@ -214,14 +264,19 @@ if ( params.assembler == 'flye' ) {
     tag "${sample}"
     cpus params.medcpus
     container 'staphb/flye:latest'
-    //errorStrategy 'ignore'
+    errorStrategy 'ignore'
 
     input:
     tuple val(sample), path(fastq) from filtered_fastq
 
     output:
-    tuple val(sample), path("${task.process}/${sample}.fasta") into assembled_fastas
+    tuple val(sample), path("${task.process}/${sample}.fasta") optional true into assembled_fastas
     path("${task.process}/${sample}/*")
+    tuple val(sample), env(num_contigs) into num_contigs
+    tuple val(sample), env(num_closed_contigs) into num_closed_contigs
+    tuple val(sample), env(chr_cov) into chr_cov
+    tuple val(sample), env(chr_closed) into chr_closed
+    tuple val(sample), env(genome_size) into genome_size
     path("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
 
     shell:
@@ -240,7 +295,21 @@ if ( params.assembler == 'flye' ) {
         --out-dir !{task.process}/!{sample} \
         2>> $err_file >> $log_file
 
-      cp !{task.process}/!{sample}/assembly.fasta !{task.process}/!{sample}.fasta
+      if [ -f "!{task.process}/!{sample}/assembly.fasta" ]
+      then
+        cp !{task.process}/!{sample}/assembly.fasta !{task.process}/!{sample}.fasta
+        num_contigs=$(grep ">" !{task.process}/!{sample}/assembly.fasta | wc -l )
+        genome_size=$(grep -v ">" !{task.process}/!{sample}/assembly.fasta | wc -c )
+        num_closed_contigs=$(cut -f 4 !{task.process}/!{sample}/assembly_info.txt | grep -w "Y" | wc -l )
+        chr_cov=$(head -n 2 !{task.process}/!{sample}/assembly_info.txt | tail -n 1 | cut -f 3)
+        chr_closed=$(head -n 2 !{task.process}/!{sample}/assembly_info.txt | tail -n 1 | cut -f 4)
+      fi
+
+      if [ -z "$num_contigs" ]        ; then num_contigs="0"        ; fi
+      if [ -z "$num_closed_contigs" ] ; then num_closed_contigs="0" ; fi
+      if [ -z "$chr_cov" ]            ; then chr_cov="0"            ; fi
+      if [ -z "$genome_size" ]        ; then genome_size="0"        ; fi
+      if [ -z "$chr_closed" ]         ; then chr_closed="0"         ; fi
     '''
   }
 } else if ( params.assembler == 'miniasm' ) {
@@ -405,7 +474,7 @@ process polca {
   publishDir "${params.outdir}", mode: 'copy', pattern: "${task.process}/${sample}/${sample}_*.fasta"
   tag "${sample} : round ${round} : changes ${changes}"
   cpus params.medcpus
-//  container 'quay.io/uphl/masurca:latest'
+  container 'staphb/masurca:latest'
 
   input:
   tuple val(sample), path(fasta), path(fastq), val(round), val(changes) from for_polca
@@ -467,6 +536,79 @@ process polca {
     fi
   '''
 }
+
+num_contigs
+  .join(num_closed_contigs, remainder: true, by: 0)
+  .join(chr_closed, remainder: true, by: 0)
+  .join(chr_cov, remainder: true, by: 0)
+  .join(genome_size, remainder: true, by: 0)
+  .join(nanoplot_mean_read_length, remainder: true, by: 0)
+  .join(nanoplot_mean_read_quality, remainder: true, by: 0)
+  .join(nanoplot_median_read_length, remainder: true, by: 0)
+  .join(nanoplot_median_read_quality, remainder: true, by: 0)
+  .join(nanoplot_number_of_reads, remainder: true, by: 0)
+  .join(nanoplot_read_length_N, remainder: true, by: 0)
+  .join(nanoplot_total_bases, remainder: true, by: 0)
+  .set { results }
+
+params.summary = true
+process summary {
+  publishDir "${params.outdir}", mode: 'copy'
+  tag "${sample}"
+  cpus 1
+  container ''
+
+  input:
+  tuple val(sample),
+    val(num_contigs),
+    val(num_closed_contigs),
+    val(chr_closed),
+    val(chr_cov),
+    val(genome_size),
+    val(nanoplot_mean_read_length),
+    val(nanoplot_mean_read_quality),
+    val(nanoplot_median_read_length),
+    val(nanoplot_median_read_quality),
+    val(nanoplot_number_of_reads),
+    val(nanoplot_read_length_N),
+    val(nanoplot_total_bases) from results
+
+  when:
+    params.summary
+
+  output:
+  path("${task.process}/${sample}.summary.tsv") into summary
+  path("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
+
+  shell:
+  '''
+    mkdir -p logs/!{task.process} !{task.process}
+    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
+
+    # time stamp + capturing tool versions
+    date | tee -a $log_file $err_file > /dev/null
+
+    header="sample\tnumber_of_contigs\tclosed_contigs\tchr_cov\tchr_closed\tgenome_size"
+    result="!{sample}\t!{num_contigs}\t!{num_closed_contigs}\t!{chr_cov}\t!{chr_closed}\t!{genome_size}"
+
+    if [ "!{params.nanoplot}" != "false" ]
+    then
+      header="$header\tmean_read_length\tmean_read_quality\tmedian_read_length\tmediean_read_quality\tnumber_of_reads\tread_length_N50\ttotal_bases"
+      result="$result\t!{nanoplot_mean_read_length}\t!{nanoplot_mean_read_quality}\t!{nanoplot_median_read_length}\t!{nanoplot_median_read_quality}\t!{nanoplot_number_of_reads}\t!{nanoplot_read_length_N}\t!{nanoplot_total_bases}"
+    fi
+
+    echo -e "$header" > !{task.process}/!{sample}.summary.tsv
+    echo -e "$result" >> !{task.process}/!{sample}.summary.tsv
+  '''
+}
+
+summary
+  .collectFile(name: "summary.tsv",
+    keepHeader: true,
+    sort: true,
+    skip: 1,
+    storeDir: "${params.outdir}")
 
 workflow.onComplete {
   println("Donut Falls complete at : $workflow.complete")
