@@ -1,22 +1,20 @@
 process polca {
-  publishDir "donut_falls", mode: 'copy'
-  tag "${sample} : round ${round} : changes ${changes}"
+  tag "${sample}"
   cpus 6
-  container 'staphb/masurca:latest'
 
   input:
-  tuple val(sample), path(fasta), path(fastq)
+  tuple val(sample), file(fasta), file(fastq)
 
   output:
-  tuple val(sample), path("next/${sample}_${round}.fasta"), path(fastq), env(next_round), env(change_test), emit: fasta
-  path "polca/${sample}", emit: directory
-  path "logs/polca/${sample}_${round}.${workflow.sessionId}.{log,err}", emit: logs
+  tuple val(sample), file("polca/${sample}_final.fa"),      emit: fasta
+  path "polca/${sample}",                                      emit: directory
+  path "logs/polca/${sample}.${workflow.sessionId}.{log,err}", emit: logs
 
   shell:
   '''
-    mkdir -p logs/polca polca/!{sample} next
-    log_file=logs/polca/!{sample}_!{round}.!{workflow.sessionId}.log
-    err_file=logs/polca/!{sample}_!{round}.!{workflow.sessionId}.err
+    mkdir -p logs/polca polca/!{sample}
+    log_file=logs/polca/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/polca/!{sample}.!{workflow.sessionId}.err
 
     # time stamp + capturing tool versions
     date | tee -a $log_file $err_file > /dev/null
@@ -25,41 +23,55 @@ process polca {
     polca.sh !{params.polca_options} \
       -r '!{fastq}' \
       -a !{fasta} \
-      -t !{task.cpus}
+      -t !{task.cpus} \
+      2>> $err_file >> $log_file
 
-    if [ -f "!{fasta}.report" ]
-    then
-      sub_err=$(grep "Substitution Errors" !{fasta}.report | awk '{print $3}')
-      del_err=$(grep "Deletion Errors" !{fasta}.report | awk '{print $3}')
-      if [ -z "$sub_err" ] ; then sub_err=0 ; fi
-      if [ -z "$del_err" ] ; then del_err=0 ; fi
-      change_test=$(( sub_err + del_err ))
-    else
-      echo "WARNING : report not found" >> $err_file
-      sub_err=0
-      del_err=0
-      change_test=0
-    fi
+    # there was going to be something fancy, but this is here instead
+    mkdir round_1
+    mv !{fasta}.* round_1/.
+    cp round_1/!{fasta}.PolcaCorrected.fa !{sample}_round1.fa
 
-    echo "The number of changes from this round was $change_test" >> $log_file
-    echo "$sub_err changes were from substitution errors" >> $log_file
-    echo "$del_err changes were from insertion/deletion errors" >> $log_file
+    polca.sh !{params.polca_options} \
+      -r '!{fastq}' \
+      -a !{sample}_round1.fa \
+      -t !{task.cpus} \
+      2>> $err_file >> $log_file
 
-    if [ "$change_test" -lt "1" ]
-    then
-      next_round=1000
-      cp !{fasta}.PolcaCorrected.fa polca/!{sample}/!{sample}_!{round}.fasta
-      cp !{fasta}.PolcaCorrected.fa polca/!{sample}/!{sample}_final.fasta
-    elif [ "$change_test" -eq "!{changes}" ] && [ "$change_test" -lt "10000" ]
-    then
-      next_round=1000
-      cp !{fasta}.PolcaCorrected.fa polca/!{sample}/!{sample}_!{round}.fasta
-      cp !{fasta}.PolcaCorrected.fa polca/!{sample}/!{sample}_final.fasta
-    else
-      cp !{fasta}.PolcaCorrected.fa polca/!{sample}/!{sample}_!{round}.fasta
+    mkdir round_2
+    mv !{sample}_round1.fa.* round_2/.
+    cp round_2/!{sample}_round1.fa.PolcaCorrected.fa !{sample}_round2.fa
 
-      next_round=$(( !{round} + 1 ))
-      if [ "$next_round" -le "!{params.max_polish_rounds}" ] ; then cp !{fasta}.PolcaCorrected.fa next/!{sample}_!{round}.fasta ; fi
-    fi
+    polca.sh !{params.polca_options} \
+      -r '!{fastq}' \
+      -a !{sample}_round2.fa \
+      -t !{task.cpus} \
+      2>> $err_file >> $log_file
+
+    mkdir round_3
+    mv !{sample}_round2.fa.* round_3/.
+    cp round_3/!{sample}_round2.fa.PolcaCorrected.fa !{sample}_round3.fa
+
+    polca.sh !{params.polca_options} \
+      -r '!{fastq}' \
+      -a !{sample}_round3.fa \
+      -t !{task.cpus} \
+      2>> $err_file >> $log_file
+
+    mkdir round_4
+    mv !{sample}_round3.fa.* round_4/.
+    cp round_4/!{sample}_round3.fa.PolcaCorrected.fa !{sample}_round4.fa
+
+    polca.sh !{params.polca_options} \
+      -r '!{fastq}' \
+      -a !{sample}_round4.fa \
+      -t !{task.cpus} \
+      2>> $err_file >> $log_file
+
+    mkdir round_5
+    mv !{sample}_round4.fa.* round_5/.
+    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa !{sample}_round5.fa
+    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa polca/!{sample}_final.fa
+    
+    mv round_* polca/!{sample}/.
   '''
 }

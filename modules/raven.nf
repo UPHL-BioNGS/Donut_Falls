@@ -1,8 +1,6 @@
- process raven {
-  publishDir "donut_falls", mode: 'copy'
+process raven {
   tag "${sample}"
   cpus 12
-  container 'staphb/raven:latest'
 
   input:
   tuple val(sample), file(fastq)
@@ -14,7 +12,7 @@
 
   shell:
   '''
-    mkdir -p raven/!{sample} logs/!{task.process}
+    mkdir -p raven/!{sample} logs/raven
     log_file=logs/raven/!{sample}.!{workflow.sessionId}.log
     err_file=logs/raven/!{sample}.!{workflow.sessionId}.err
 

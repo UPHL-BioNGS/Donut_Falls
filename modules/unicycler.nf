@@ -1,8 +1,6 @@
 process unicycler {
-    publishDir "donut_falls", mode: 'copy'
     tag "${sample}"
     cpus 6
-    container "staphb/unicycler:latest"
 
     input:
     tuple val(sample), file(nanopore), file(illumina)
@@ -22,10 +20,11 @@ process unicycler {
     unicycler --version >> $log_file
 
     unicycler !{params.unicycler_options} \
-        -1 !{illumina[0]} \
-        -2 !{illumina[1]} \
-        -l !{nanopore} \
-        -o unicycler/!{sample} \
-        -t 20
+      -1 !{illumina[0]} \
+      -2 !{illumina[1]} \
+      -l !{nanopore} \
+      -o unicycler/!{sample} \
+      -t 20 \
+      2>> $err_file >> $log_file
     '''
 }

@@ -1,8 +1,6 @@
 process medaka {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 6
-  container 'ontresearch/medaka:latest'
 
   input:
   tuple val(sample), path(fasta), path(fastq)
@@ -26,7 +24,8 @@ process medaka {
       -i !{fastq} \
       -d !{fasta} \
       -o medaka/!{sample} \
-      -t 2
+      -t 2 \
+      2>> $err_file >> $log_file
 
     cp medaka/!{sample}/consensus.fasta medaka/!{sample}/!{sample}_medaka_consensus.fasta
   '''

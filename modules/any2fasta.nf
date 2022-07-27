@@ -1,14 +1,12 @@
 process any2fasta {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/any2fasta:latest'
 
   input:
   tuple val(sample), file(gfa)
 
   output:
-  tuple val(sample), file("miniasm/${sample}.fasta"),               emit: fasta
+  tuple val(sample), file("miniasm/${sample}/${sample}.fasta"),               emit: fasta
   path("logs/any2fasta/${sample}.${workflow.sessionId}.{log,err}"), emit: logs
 
   shell:
@@ -24,6 +22,6 @@ process any2fasta {
     any2fasta \
       !{gfa} \
       2>> $err_file \
-      > miniasm/!{sample}.fasta
+      > miniasm/!{sample}/!{sample}.fasta
   '''
 }

@@ -1,8 +1,6 @@
 process summary {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/nanoplot:latest'
 
   input:
   tuple val(sample),

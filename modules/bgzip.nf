@@ -1,8 +1,6 @@
 process bgzip {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/htslib:latest'
 
   input:
   tuple val(sample), file(fastq)

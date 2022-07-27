@@ -1,8 +1,6 @@
 process filtlong {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/filtlong:latest'
 
   input:
   tuple val(sample), file(fastq), file(short_reads)

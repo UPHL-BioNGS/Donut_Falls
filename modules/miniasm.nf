@@ -1,8 +1,6 @@
   process miniasm {
-  publishDir "donut_falls", mode: 'copy'
   tag "${sample}"
   cpus 12
-  container 'staphb/minipolish:latest'
 
   input:
   tuple val(sample), file(fastq)
@@ -24,7 +22,7 @@
     minimap2 --version 2>> $err_file >> $log_file
     minipolish --version 2>> $err_file >> $log_file
 
-    miniasm_and_minipolish.sh !{params.miniasm_options} \
+    miniasm_and_minipolish.sh \
       !{fastq} \
       !{task.cpus} \
       2>> $err_file > miniasm/!{sample}/!{sample}.gfa
