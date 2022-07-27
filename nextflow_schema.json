@@ -1,0 +1,74 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/UPHL-BioNGS/Donut_Falls/main/nextflow_schema.json",
+    "title": "Donut Falls Parameters",
+    "description": "Donut Falls is a workflow for assembly from nanopore or nanopore/illumina reads",
+    "type": "object",
+    "properties": {
+        "config_file": {
+            "type": "boolean",
+            "description" : "Specifies if a config file is copied for the end user. Ends script."
+        },
+        "assembler": { 
+            "type": "string", 
+            "description": "Specifies which assembler is going to be used.",
+            "enum": ["unicycler", "raven", "flye", "miniasm"]
+        },
+        "sequencing_summary": { 
+            "type": "string", 
+            "description": "input channel for nanopore sequencing summary file (optional)"
+        },
+        "reads": { 
+            "type": "string", 
+            "description": "input channel for nanopore reads"
+        },
+        "illumina": { 
+            "type": "string", 
+            "description": "input channel for illumina reads"
+        },
+        "outdir": { 
+            "type": "string", 
+            "description": "Specifies where results are saved"
+        },
+        "nanoplot_summary_options": { 
+                    "type": "string", 
+                    "description": "Options for process"
+                },
+        "nanoplot_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "nanoplot_illumina_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "unicycler_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "raven_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "flye_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "filtlong_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "medaka_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "polca_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        },
+        "fastp_options": { 
+            "type": "string", 
+            "description": "Options for process"
+        }
+    }
+}
