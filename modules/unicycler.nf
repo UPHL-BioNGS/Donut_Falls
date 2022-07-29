@@ -1,17 +1,17 @@
 process unicycler {
-    tag "${sample}"
-    cpus 6
+  tag "${sample}"
+  cpus 12
 
-    input:
-    tuple val(sample), file(nanopore), file(illumina)
+  input:
+  tuple val(sample), file(nanopore), file(illumina)
 
-    output:
-    path "unicycler",                                                 emit: directory
-    tuple val(sample), file("unicycler/${sample}.fasta"),             emit: fasta
-    path "logs/unicycler/${sample}.${workflow.sessionId}.{log,err}",  emit: logs
+  output:
+  path "unicycler/${sample}",                                       emit: directory
+  tuple val(sample), file("unicycler/${sample}/assembly.fasta"),    emit: fasta
+  path "logs/unicycler/${sample}.${workflow.sessionId}.{log,err}",  emit: logs
 
-    shell:
-    '''
+  shell:
+  '''
     mkdir -p unicycler logs/unicycler
     log_file=logs/unicycler/!{sample}.!{workflow.sessionId}.log
     err_file=logs/unicycler/!{sample}.!{workflow.sessionId}.err
@@ -26,5 +26,5 @@ process unicycler {
       -o unicycler/!{sample} \
       -t 20 \
       2>> $err_file >> $log_file
-    '''
+  '''
 }
