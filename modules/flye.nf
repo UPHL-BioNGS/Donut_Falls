@@ -1,7 +1,7 @@
 process flye {
   tag "${sample}"
   cpus 12
-  errorStrategy 'ignore'
+  //errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(fastq)
@@ -28,6 +28,6 @@ process flye {
       --out-dir flye/!{sample} \
       2>> $err_file >> $log_file
 
-    if [ -f "flye/!{sample}/assembly.fasta" ] ; then cp flye/!{sample}/assembly.fasta flye/!{sample}/!{sample}.fasta fi
+    if [ -f "flye/!{sample}/assembly.fasta" ] ; then cp flye/!{sample}/assembly.fasta flye/!{sample}/!{sample}.fasta ; fi
   '''
 }
