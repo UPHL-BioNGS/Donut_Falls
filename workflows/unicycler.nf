@@ -1,12 +1,12 @@
 include { unicycler } from '../modules/unicycler.nf' addParams(unicycler_options: params.unicycler_options)
 
-workflow unicycler {
+workflow hybrid {
     take:
-    nanopore
-    illumina
+    reads
 
     main:
-    unicycler(reads.join(illumina_fastqs, by: 0))
+    reads
+    unicycler(reads)
     
     emit:
     fasta = unicycler.out.fasta
