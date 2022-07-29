@@ -1,0 +1,27 @@
+process any2fasta {
+  tag "${sample}"
+  cpus 1
+
+  input:
+  tuple val(sample), file(gfa)
+
+  output:
+  tuple val(sample), file("miniasm/${sample}/${sample}.fasta"),               emit: fasta
+  path("logs/any2fasta/${sample}.${workflow.sessionId}.{log,err}"), emit: logs
+
+  shell:
+  '''
+    mkdir -p miniasm/!{sample} logs/any2fasta
+    log_file=logs/any2fasta/!{sample}.!{workflow.sessionId}.log
+    err_file=logs/any2fasta/!{sample}.!{workflow.sessionId}.err
+
+    # time stamp + capturing tool versions
+    date | tee -a $log_file $err_file > /dev/null
+    any2fasta -v 2>> $err_file >> $log_file
+
+    any2fasta \
+      !{gfa} \
+      2>> $err_file \
+      > miniasm/!{sample}/!{sample}.fasta
+  '''
+}
