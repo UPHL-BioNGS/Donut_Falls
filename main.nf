@@ -31,7 +31,7 @@ params.illumina                   = workflow.launchDir + '/illumina'
 params.assembler                  = 'flye'
 params.outdir                     = 'donut_falls'
 
-params.nanoplot_summary_options   = '--barcoded'
+params.nanoplot_summary_options   = ''
 params.nanoplot_options           = ''
 params.nanoplot_illumina_options  = ''
 params.unicycler_options          = ''
@@ -49,7 +49,7 @@ include { donut_falls }                                   from './workflows/donu
                                                                                             medaka_options: params.medaka_options,
                                                                                             filtlong_options: params.filtlong_options,
                                                                                             fastp_options: params.fastp_options)
-include { unicycler }                                     from './workflows/unicycler.nf'   addParams(unicycler_options: params.unicycler_options)
+include { hybrid }                                        from './workflows/unicycler.nf'   addParams(unicycler_options: params.unicycler_options)
 include { nanoplot; nanoplot_summary; nanoplot_illumina } from './modules/nanoplot.nf'      addParams(nanoplot_options: params.nanoplot_options,
                                                                                             nanoplot_summary_options: params.nanoplot_summary_options,
                                                                                             nanoplot_illumina_options: params.nanoplot_illumina_options)
@@ -82,7 +82,7 @@ workflow {
   if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' ) {
     donut_falls(fastq, illumina_fastq)
   } else if ( params.assembler == 'unicycler' ) {
-    unicycler(fastq, illumina_fastq)
+    hybrid(fastq.join(illumina_fastq, by: 0))
   }
 
   nanoplot.out.summary.collectFile(name: "NanoStats.csv",
