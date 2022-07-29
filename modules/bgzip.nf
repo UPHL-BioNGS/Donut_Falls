@@ -19,7 +19,7 @@ process bgzip {
     date | tee -a $log_file $err_file > /dev/null
     bgzip --version 2>> $err_file >> $log_file
 
-    bgzip -@ {task.cpus} !{fastq}
+    bgzip -@ !{task.cpus} !{fastq}
     mv !{fastq}.gz filtlong/.
   '''
 }
