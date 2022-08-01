@@ -30,13 +30,13 @@ cat fastq_pass/barcode01/*fastq.gz > reads/sample.fastq.gz
 ## Usage
 
 ```
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads>
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads <path to reads>
 ```
 
 ### If there are Illumina short - reads that can used for polishing
 
 ```
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads> --illumina <path to illumina reads>
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads <path to reads> --illumina <path to illumina reads>
 ```
 
 Illumina reads need to match the same naming convention as the nanopore reads (i.e. `12345.fastq.gz` for nanopore and `12345_R1.fastq.gz` and `12345_R2.fastq.gz` for Illumina)
@@ -52,19 +52,19 @@ These are specified with the `assembler` paramater.
 
 ```
 # flye (default)
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads reads --assembler flye
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads reads --assembler flye
 # miniasm and minipolish
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads reads --assembler miniasm
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads reads --assembler miniasm
 # raven
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads reads --assembler raven
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads reads --assembler raven
 # unicycler
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads reads --illumina illumina --assembler unicycler
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads reads --illumina illumina --assembler unicycler
 ```
 
 ### Reading the sequencing summary file
 Although not used for anything else, the sequencing summary file can be read in and put through nanoplot to assess the quality of a sequencing run. This is an optional file and can be set with 'params.sequencing_summary'. 
 ```
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads> --sequencing_summary <sequencing summary file>
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads <path to reads> --sequencing_summary <sequencing summary file>
 ```
 * WARNING : Does not work with _older_ versions of the summary file.
 
@@ -300,14 +300,14 @@ In general, longer reads are better.
 ### Where is an example config file?
 To get a copy of the [template file](.configs/donut_falls_template.config) that Donut Falls uses by default, run 
 ```
-nextflow run UPHL-BioNGS/Donut_Falls --config_file true
+nextflow run UPHL-BioNGS/Donut_Falls -r main --config_file true
 ```
 This creates an `edit_me.config` file in the current directory that the **End User** can edit for their own purpose. This file can be renamed with no penalty.
 
 To use this edited config file, simply use `-c` on the command line.
 
 ```
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads reads -c edit_me.config
+nextflow run UPHL-BioNGS/Donut_Falls -r main -profile singularity --reads reads -c edit_me.config
 ```
 
 ### Why does flye keep failing?
