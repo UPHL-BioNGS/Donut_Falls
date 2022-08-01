@@ -16,7 +16,6 @@ Donut Falls will also probably be a workflow of the [staphb-toolkit](https://git
 
 ### Install dependencies
 - [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html)
-   - Nextflow version 20+ is required (`nextflow -v` to check)
 - [Singularity](https://singularity.lbl.gov/install-linux) or [Docker](https://docs.docker.com/get-docker/)
 
 It is highly recommended to use [bandage](https://rrwick.github.io/Bandage/) to visualize the assemblies, but this is optional. 
@@ -68,6 +67,10 @@ Although not used for anything else, the sequencing summary file can be read in 
 nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --reads <path to reads> --sequencing_summary <sequencing summary file>
 ```
 * WARNING : Does not work with _older_ versions of the summary file.
+
+## Diagram of workflow
+<img src="./images/Donut Falls.png">
+
 
 ## Final file structure
 
