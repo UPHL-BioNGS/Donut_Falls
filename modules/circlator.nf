@@ -1,30 +1,34 @@
 process circlator {
+  publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
+  //container 'quay.io/biocontainers/circlator:1.5.5--py_3'
+  //container 'staphb/circlator:latest'
+  //container 'sangerpathogens/circlator:latest'
 
   input:
   tuple val(sample), file(fasta)
 
   output:
-  tuple val(sample), file("circlator/${sample}/${sample}.fasta"),   emit: fasta
-  path("circlator/${sample}/*"),                                    emit: directory
-  path("logs/circlator/${sample}.${workflow.sessionId}.{log,err}"), emit: logs
+  tuple val(sample), file("circlator/${sample}_unpolished.fasta"),   emit: fasta
+  path("circlator/${sample}*"),                                    emit: directory
 
   shell:
   '''
-    mkdir -p circlator/!{sample} logs/circlator
-    log_file=logs/circlator/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/circlator/!{sample}.!{workflow.sessionId}.err
+    mkdir -p circlator
 
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    circlator --version 2>> $err_file >> $log_file
+    circlator version
 
-    circlator fixstart  
-        !{fasta} \
-        circlator/!{sample} \
-        2>> $err_file >> $log_file
+    touch test_circular.fasta
+    cat *circular.fasta > circular.fasta
 
-    exit 1
+    circlator fixstart !{params.circlator_options} \
+        circular.fasta \
+        circlator/!{sample}_fixstart
+
+    cp circlator/!{sample}_fixstart.fasta circlator/!{sample}_unpolished.fasta
+
+    touch test_open.fasta
+    cat *open.fasta >> circlator/!{sample}_unpolished.fasta
   '''
 }

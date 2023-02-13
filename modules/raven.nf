@@ -1,30 +1,27 @@
 process raven {
+  publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 12
+  container 'staphb/raven:latest'
 
   input:
   tuple val(sample), file(fastq)
 
   output:
-  tuple val(sample), file("raven/${sample}/${sample}.fasta"),   emit: fasta
+  tuple val(sample), file("raven/${sample}/${sample}_raven.fasta"),   emit: fasta
+  tuple val(sample), file("raven/${sample}/${sample}_raven.gfa"),   emit: gfa
   path("raven/${sample}/*"),                                    emit: directory
-  path("logs/raven/${sample}.${workflow.sessionId}.{log,err}"), emit: logs
 
   shell:
   '''
-    mkdir -p raven/!{sample} logs/raven
-    log_file=logs/raven/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/raven/!{sample}.!{workflow.sessionId}.err
+    mkdir -p raven/!{sample}
 
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    raven --version 2>> $err_file >> $log_file
+    raven --version
 
     raven !{params.raven_options} \
       --threads !{task.cpus} \
-      --graphical-fragment-assembly raven/!{sample}/!{sample}.gfa \
+      --graphical-fragment-assembly raven/!{sample}/!{sample}_raven.gfa \
       !{fastq} \
-      2>> $err_file \
-      > raven/!{sample}/!{sample}.fasta
+      > raven/!{sample}/!{sample}_raven.fasta
   '''
 }
