@@ -14,16 +14,16 @@ workflow assembly {
     ch_gfa   = Channel.empty()
     ch_fasta = Channel.empty()
 
-    if (params.assembler == 'raven') {
+    if (params.assembler == 'raven' ) {
         raven(ch_fastq)
         ch_gfa = ch_gfa.mix(raven.out.gfa)
     } else if (params.assembler == 'flye' ) {
         flye(ch_fastq)
         ch_gfa = ch_gfa.mix(flye.out.gfa)
-    } else if (params.assembler == 'miniasm') {
+    } else if (params.assembler == 'miniasm' ) {
         miniasm(ch_fastq)
         ch_gfa = ch_gfa.mix(miniasm.out.gfa)
-    } else if (params.assembler == 'unicycler') {
+    } else if (params.assembler == 'lr_unicycler' ) {
         unicycler(ch_fastq)
         ch_fasta = unicycler.out.fasta
     }
