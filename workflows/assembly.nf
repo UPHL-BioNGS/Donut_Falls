@@ -11,7 +11,8 @@ workflow assembly {
     ch_fastq
 
     main:
-    ch_gfa = Channel.empty()
+    ch_gfa   = Channel.empty()
+    ch_fasta = Channel.empty()
 
     if (params.assembler == 'raven') {
         raven(ch_fastq)
@@ -24,12 +25,12 @@ workflow assembly {
         ch_gfa = ch_gfa.mix(miniasm.out.gfa)
     } else if (params.assembler == 'unicycler') {
         unicycler(ch_fastq)
-        fasta = unicycler.out.fasta
+        ch_fasta = unicycler.out.fasta
     }
 
     gfastats(ch_gfa)
     circlator(gfastats.out.fasta)
-    medaka(circlator.out.fasta.join(ch_fastq, by:0))
+    medaka(circlator.out.fasta.mix(ch_fasta).join(ch_fastq, by:0))
 
     emit:
     fasta = medaka.out.fasta
