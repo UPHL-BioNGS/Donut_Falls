@@ -1,7 +1,7 @@
-include { assembly as flye_assembly }                                        from './assembly'           addParams(assembler:'flye' )
-include { assembly as miniasm_assembly }                                     from './assembly'           addParams(assembler: 'minasm' )
+include { assembly as flye_assembly }                                        from './assembly'           addParams(assembler: 'flye' )
+include { assembly as miniasm_assembly }                                     from './assembly'           addParams(assembler: 'miniasm' )
 include { assembly as raven_assembly }                                       from './assembly'           addParams(assembler: 'raven')
-include { assembly as unicycler_assembly }                                   from './assembly'           addParams(assembler: 'unicycler')
+include { assembly as unicycler_assembly }                                   from './assembly'           addParams(assembler: 'lr_unicycler')
 include { bgzip }                                                            from '../modules/bgzip'     addParams(params)
 include { cluster; consensus; dotplot; msa; partition; reconcile; subsample} from '../modules/trycycler' addParams(params)
 
