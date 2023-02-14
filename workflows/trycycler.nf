@@ -21,20 +21,20 @@ workflow trycycler {
         }
         .set { ch_subsampled }
 
-    flye_assembly(ch_subsampled.flye.transpose().map { it -> tuple(it[1],it[2])})
-    miniasm_assembly(ch_subsampled.miniasm.transpose().map { it -> tuple(it[1],it[2])})
-    raven_assembly(ch_subsampled.raven.transpose().map { it -> tuple(it[1],it[2])})
-    unicycler_assembly(ch_subsampled.unicycler.transpose().map { it -> tuple(it[1],it[2])})
+    flye_assembly(ch_subsampled.flye.transpose().map           { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    miniasm_assembly(ch_subsampled.miniasm.transpose().map     { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    raven_assembly(ch_subsampled.raven.transpose().map         { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    unicycler_assembly(ch_subsampled.unicycler.transpose().map { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
 
-    ch_fastq
-        .join(flye_assembly.out.fasta, by:1)
-        .join(miniasm_assembly.out.fasta, by:1)
-        .join(raven_assembly.out.fasta, by: 1)
-        .join(unicycler_assembly.out.fasta, by:1)
-        .view()
-        .groupTuple()
-        .view()
-        .set { ch_assemblies }
+    // ch_fastq
+    //     .join(flye_assembly.out.fasta, by:1)
+    //     .join(miniasm_assembly.out.fasta, by:1)
+    //     .join(raven_assembly.out.fasta, by: 1)
+    //     .join(unicycler_assembly.out.fasta, by:1)
+    //     .view()
+//        .groupTuple()
+//        .view()
+//        .set { ch_assemblies }
 
 //     cluster(ch_assemblies)
 //     dotplot(cluster.out.cluster)
