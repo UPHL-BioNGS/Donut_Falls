@@ -8,8 +8,8 @@ process unicycler {
   tuple val(sample), file(nanopore), file(illumina)
 
   output:
-  path "unicycler/${sample}",                                       emit: directory
-  tuple val(sample), file("unicycler/${sample}/assembly.fasta"),    emit: fasta
+  path "unicycler/${sample}",                                    emit: directory
+  tuple val(sample), file("unicycler/${sample}/assembly.fasta"), emit: fasta
 
   shell:
   '''
@@ -24,7 +24,7 @@ process unicycler {
       -o unicycler/!{sample} \
       -t 20 
 
-    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta
+    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta ; fi 
     '''
 }
 
@@ -38,8 +38,9 @@ process unicycler_long {
   tuple val(sample), file(nanopore)
 
   output:
-  path "unicycler/${sample}",                                       emit: directory
-  tuple val(sample), file("unicycler/${sample}/assembly.fasta"),    emit: fasta
+  path "unicycler/${sample}",                                    emit: directory
+  tuple val(sample), file("unicycler/${sample}/assembly.fasta"), emit: fasta
+  tuple val(sample), file("unicycler/${sample}/assembly.gfa"),   emit: gfa
 
   shell:
   '''
@@ -52,6 +53,7 @@ process unicycler_long {
       -o unicycler/!{sample} \
       -t !{task.cpus}
 
-    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta
+    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta ; fi
+    if [ -f "unicycler/!{sample}/assembly.gfa" ] ; then cp unicycler/!{sample}/assembly.gfa unicycler/!{sample}/!{sample}.gfa ; fi
     '''
 }
