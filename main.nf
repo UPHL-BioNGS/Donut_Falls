@@ -66,7 +66,7 @@ workflow {
   if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' ) {
     filter(ch_input_files)
     assembly(filter.out.fastq)
-  } else if ( params.assembler == 'unicycler' ) or (params.assembler == 'masurca' ) {
+  } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
     hybrid(ch_input_files)
   } else if ( params.assembler == 'trycycler' ) {
     filter(ch_input_files)
