@@ -1,16 +1,17 @@
-include { medaka } from '../modules/medaka'     addParams(params)
-include { polca } from '../modules/masurca'    addParams(params)
-include { pilon } from '../modules/pilon' addParams(params)
+include { medaka } from '../modules/medaka'  addParams(params)
+include { polca }  from '../modules/masurca' addParams(params)
+//include { pilon }  from '../modules/pilon' addParams(params)
 
 workflow polish {
     take:
-    fastq
-    illumina
+    ch_fastq
+    ch_fasta
+    ch_illumina
 
     main:
-
-    polca(medaka.out.fasta.join(fastp.out.reads, by:0))
+    medaka(ch_fasta.join(ch_fastq, by:0))
+    polca(medaka.out.fasta.join(ch_illumina, by:0))
 
     emit:
-    fasta = fasta
+    fasta = polca.out.fasta
 }
