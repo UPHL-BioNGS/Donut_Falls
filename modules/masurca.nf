@@ -33,8 +33,8 @@ process polca {
   tuple val(sample), file(fasta), file(fastq)
 
   output:
-  tuple val(sample), file("polca/${sample}_final.fa"),      emit: fasta
-  path "polca/${sample}",                                      emit: directory
+  tuple val(sample), file("polca/${sample}_final.fa"), emit: fasta
+  path "polca/${sample}",                              emit: directory
 
   shell:
   '''
