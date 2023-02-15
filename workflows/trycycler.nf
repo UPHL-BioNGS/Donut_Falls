@@ -1,13 +1,14 @@
-include { assembly as flye_assembly }                                        from './assembly'           addParams(assembler: 'flye' )
-include { assembly as miniasm_assembly }                                     from './assembly'           addParams(assembler: 'miniasm' )
-include { assembly as raven_assembly }                                       from './assembly'           addParams(assembler: 'raven')
-include { assembly as unicycler_assembly }                                   from './assembly'           addParams(assembler: 'lr_unicycler')
-include { bgzip }                                                            from '../modules/bgzip'     addParams(params)
-include { cluster; consensus; dotplot; msa; partition; reconcile; subsample} from '../modules/trycycler' addParams(params)
+include { assembly as flye_assembly }                                         from './assembly'           addParams(assembler: 'flye' )
+include { assembly as miniasm_assembly }                                      from './assembly'           addParams(assembler: 'miniasm' )
+include { assembly as raven_assembly }                                        from './assembly'           addParams(assembler: 'raven')
+include { assembly as unicycler_assembly }                                    from './assembly'           addParams(assembler: 'lr_unicycler')
+include { cluster; consensus; dotplot; msa; partition; reconcile; subsample } from '../modules/trycycler' addParams(params)
+include { combine }                                                           from '../modules/trycycler' addParams(params)
 
 workflow trycycler {
     take:
     ch_fastq
+    ch_remove
 
     main:
     subsample(ch_fastq)
@@ -26,24 +27,24 @@ workflow trycycler {
     raven_assembly(ch_subsampled.raven.transpose().map         { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
     unicycler_assembly(ch_subsampled.unicycler.transpose().map { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
 
-    // ch_fastq
-    //     .join(flye_assembly.out.fasta, by:1)
-    //     .join(miniasm_assembly.out.fasta, by:1)
-    //     .join(raven_assembly.out.fasta, by: 1)
-    //     .join(unicycler_assembly.out.fasta, by:1)
-    //     .view()
-//        .groupTuple()
-//        .view()
-//        .set { ch_assemblies }
+    flye_assembly.out.assembly
+        .mix(miniasm_assembly.out.assembly)
+        .mix(raven_assembly.out.assembly)
+        .mix(unicycler_assembly.out.assembly)
+        .map { it -> tuple( it[0].replaceAll(~/_flye.+/,"").replaceAll(~/_miniasm.+/,"").replaceAll(~/_raven.+/,"").replaceAll(~/_unicycler.+/,""), it[1])}
+        .groupTuple()
+        .join(ch_fastq, by:0)
+        .set { ch_assemblies }
 
-//     cluster(ch_assemblies)
-//     dotplot(cluster.out.cluster)
-//     reconcile(cluster.out.cluster)
-//     msa(reconcile.out.cluster)
-//     partition(msa.out.cluster)
-//     consensus(partition.out.cluster)
+    cluster(ch_assemblies)
+    //dotplot(cluster.out.cluster.transpose())
+    reconcile(cluster.out.cluster.join(ch_fastq, by: 0).transpose().combine(ch_remove))
+    msa(reconcile.out.cluster)
+    partition(msa.out.cluster.groupTuple().join(ch_fastq, by: 0).transpose())
+    consensus(partition.out.cluster)
+    combine(consensus.out.fasta.groupTuple())
 
-//     emit:
-//     consensus = consensus.out.fasta
+    emit:
+    fasta = combine.out.fasta
     
 }
