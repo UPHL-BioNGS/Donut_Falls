@@ -8,8 +8,10 @@ process gfastats {
   tuple val(sample), file(gfa)
 
   output:
-  tuple val(sample), file("gfastats/${sample}_*.fasta"), optional: true, emit: fasta
+  tuple val(sample), file("gfastats/${sample}_{circular,open}.fasta"), optional: true, emit: fasta
+  tuple val(sample), file("gfastats/${sample}.fasta"), optional: true, emit: assembly
   path "gfastats/*"
+  path "gfastats/${sample}_gfastats_summary.csv",                        emit: summary
 
   shell:
   '''
@@ -42,6 +44,11 @@ process gfastats {
         grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}_${header}_open.fasta
       fi
     fi
+    echo ">!{sample}_${header}" >> gfastats/!{sample}.fasta
+    grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}.fasta
   done < <(grep -v Header gfastats/!{sample}_gfastats.txt | tr "\\t" ",")
+
+  head -n 1 gfastats/!{sample}_gfastats.txt | tr "\\t" "," | awk '{print "sample," $0 "circular" }' > gfastats/!{sample}_gfastats_summary.csv
+  tail -n+2 gfastats/!{sample}_gfastats.txt | tr "\\t" "," | awk -v sample=!{sample} '{print sample "," $0 }' >> gfastats/!{sample}_gfastats_summary.csv
   '''
 }
