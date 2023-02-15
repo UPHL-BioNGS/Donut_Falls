@@ -20,6 +20,15 @@ workflow assembly {
     } else if (params.assembler == 'flye' ) {
         flye(ch_fastq)
         ch_gfa = ch_gfa.mix(flye.out.gfa)
+
+        flye.out.summary
+            .collectFile(
+                storeDir: "${params.outdir}/flye/",
+                keepHeader: true,
+                sort: { file -> file.text },
+                name: "flye_summary.csv")
+            .set { flye_summary }
+
     } else if (params.assembler == 'miniasm' ) {
         miniasm(ch_fastq)
         ch_gfa = ch_gfa.mix(miniasm.out.gfa)
@@ -30,8 +39,24 @@ workflow assembly {
 
     gfastats(ch_gfa)
     circlator(gfastats.out.fasta)
-    medaka(circlator.out.fasta.mix(ch_fasta).join(ch_fastq, by:0))
+
+    gfastats.out.summary
+        .collectFile(
+            storeDir: "${params.outdir}/gfastats/",
+            keepHeader: true,
+            sort: { file -> file.text },
+            name: "gfastats_summary.csv")
+        .set { gfastats_summary }
+
+    circlator.out.summary
+        .collectFile(
+            storeDir: "${params.outdir}/circlator/",
+            keepHeader: true,
+            sort: { file -> file.text },
+            name: "circlator_summary.csv")
+        .set { circlator_summary }
 
     emit:
-    fasta = medaka.out.fasta
+    fasta    = circlator.out.fasta.mix(ch_fasta)
+    assembly = gfastats.out.assembly.mix(ch_fasta)
 }
