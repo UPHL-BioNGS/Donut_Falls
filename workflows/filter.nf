@@ -15,4 +15,5 @@ workflow filter {
 
     emit:
     fastq = bgzip.out.fastq
+    reads = fastp.out.reads
 }
