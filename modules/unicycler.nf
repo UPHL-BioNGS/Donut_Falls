@@ -9,7 +9,7 @@ process unicycler {
 
   output:
   path "unicycler/${sample}",                                    emit: directory
-  tuple val(sample), file("unicycler/${sample}/assembly.fasta"), emit: fasta
+  tuple val(sample), file("unicycler/${sample}/${sample}.fasta"), emit: fasta
 
   shell:
   '''
@@ -39,8 +39,8 @@ process unicycler_long {
 
   output:
   path "unicycler/${sample}",                                    emit: directory
-  tuple val(sample), file("unicycler/${sample}/assembly.fasta"), emit: fasta
-  tuple val(sample), file("unicycler/${sample}/assembly.gfa"),   emit: gfa
+  tuple val(sample), file("unicycler/${sample}/${sample}.fasta"), emit: fasta
+  tuple val(sample), file("unicycler/${sample}/${sample}.gfa"),   emit: gfa
 
   shell:
   '''
