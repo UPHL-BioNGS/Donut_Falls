@@ -183,7 +183,7 @@ process partition {
 }
 
 process consensus {
-  publishDir "${params.outdir}/trycycler", mode: 'copy'
+  publishDir "${params.outdir}/trycycler/${sample}", mode: 'copy'
   tag "${sample}_${cluster}"
   cpus 12
   container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
@@ -192,7 +192,7 @@ process consensus {
   tuple val(sample), path(cluster)
 
   output:
-  tuple val(sample), path("trycycler/${sample}_${cluster}_trycycler_consensus.fasta"), emit: fasta
+  tuple val(sample), path("${cluster}/${sample}_*_trycycler_consensus.fasta"), emit: fasta
   path "${cluster}"
 
   shell:
