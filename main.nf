@@ -17,19 +17,13 @@ if (params.config_file) {
   exit 0
 }
 
-//# TODO : add circlator
-//# TODO : add something to evaluate fastas
-//# TODO : add summary file
-//# TODO : add trycycler
-//# TODO : add multiqc
-//# TODO : metric subworkflow
-
 params.sequencing_summary          = workflow.launchDir + "/*sequencing_summary*txt"
 params.sample_sheet                = 'sample_sheet.csv'
 params.assembler                   = 'flye'
 params.outdir                      = 'donut_falls'
 params.remove                      = 'remove.txt'
 
+params.busco_options               = ''
 params.circlator_options           = ''
 params.fastp_options               = ''
 params.filtlong_options            = '--min_length 1000 --keep_percent 95'
@@ -37,10 +31,13 @@ params.flye_options                = ''
 params.gfastats_options            = ''
 params.masurca_options             = ''
 params.medaka_options              = ''
+params.multiqc_options             = ''
 params.nanoplot_summary_options    = ''
 params.nanoplot_options            = ''
 params.polca_options               = ''
 params.porechop_options            = ''
+params.quast_options               = ''
+params.rasusa_options              = '--frac 80'
 params.raven_options               = '--polishing-rounds 2'
 params.trycycler_subsample_options = ''
 params.trycycler_cluster_options   = ''
@@ -57,7 +54,7 @@ include { hybrid }                       from './workflows/hybrid'    addParams(
 include { nanoplot_summary as nanoplot } from './modules/nanoplot'    addParams(params)
 include { polish }                       from './workflows/polish'    addParams(params)
 include { trycycler }                    from './workflows/trycycler' addParams(params)
-// include { evaluate }                   from './workflows/evaluate'   addParams(params)
+include { metrics }                      from './workflows/metrics'   addParams(params)
 
 Channel
   .fromPath(params.sequencing_summary, type:'file')
@@ -104,6 +101,8 @@ workflow {
   polish(ch_fastq, ch_fasta, ch_illumina.ifEmpty([]))
 
   ch_consensus = ch_consensus.mix(polish.out.fasta)
-  // evaluate(ch_consensus)
-
+  metrics(
+    ch_input_files.map{it -> tuple (it[0], it[1])},
+    ch_consensus,
+    assembly.out.summary.ifEmpty([]))
 }
