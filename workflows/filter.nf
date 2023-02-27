@@ -14,6 +14,7 @@ workflow filter {
     bgzip(filtlong.out.fastq)
 
     emit:
-    fastq = bgzip.out.fastq
-    reads = fastp.out.reads
+    fastq   = bgzip.out.fastq
+    reads   = fastp.out.reads
+    summary = fastp.out.summary
 }
