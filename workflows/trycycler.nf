@@ -4,6 +4,7 @@ include { assembly as raven_assembly }                                        fr
 include { assembly as unicycler_assembly }                                    from './assembly'           addParams(assembler: 'lr_unicycler')
 include { cluster; consensus; dotplot; msa; partition; reconcile; subsample } from '../modules/trycycler' addParams(params)
 include { combine }                                                           from '../modules/trycycler' addParams(params)
+include { rasusa }                                                            from '../modules/rasusa'    addParams(params)
 
 workflow trycycler {
     take:
@@ -12,8 +13,10 @@ workflow trycycler {
 
     main:
     subsample(ch_fastq)
+    rasusa(subsample.out.full)
 
     subsample.out.fastq
+        .mix(rasusa.out.fastq)
         .multiMap { it ->
            flye:      tuple (it[0], it[0] + '_flye',      [it[1][1], it[1][5], it[1][9]])
            miniasm:   tuple (it[0], it[0] + '_miniasm',   [it[1][2], it[1][6], it[1][10]])
@@ -45,6 +48,5 @@ workflow trycycler {
     combine(consensus.out.fasta.groupTuple())
 
     emit:
-    fasta = combine.out.fasta
-    
+    fasta = combine.out.fasta    
 }
