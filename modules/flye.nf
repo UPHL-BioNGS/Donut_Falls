@@ -3,7 +3,7 @@ process flye {
   tag "${sample}"
   cpus 12
   container 'staphb/flye:latest'
-  //errorStrategy 'ignore'
+  errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(fastq)

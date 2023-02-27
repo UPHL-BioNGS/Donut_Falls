@@ -3,6 +3,7 @@ process raven {
   tag "${sample}"
   cpus 12
   container 'staphb/raven:latest'
+  errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(fastq)

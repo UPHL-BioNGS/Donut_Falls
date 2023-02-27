@@ -3,12 +3,16 @@ process unicycler {
   cpus 12
   publishDir "${params.outdir}", mode: 'copy'
   container 'staphb/unicycler:latest'
+  errorStrategy 'ignore'
+
+  when:
+  illumina != null
 
   input:
   tuple val(sample), file(nanopore), file(illumina)
 
   output:
-  path "unicycler/${sample}",                                    emit: directory
+  path "unicycler/${sample}",                                     emit: directory
   tuple val(sample), file("unicycler/${sample}/${sample}.fasta"), emit: fasta
 
   shell:
@@ -33,6 +37,7 @@ process unicycler_long {
   cpus 12
   publishDir "${params.outdir}", mode: 'copy'
   container 'staphb/unicycler:latest'
+  errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(nanopore)
