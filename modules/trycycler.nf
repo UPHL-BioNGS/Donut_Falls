@@ -8,39 +8,22 @@ process subsample {
     tuple val(sample), file(fastq)
 
     output:
-    tuple val(sample), file("trycycler/subsample/${sample}/*fastq"), emit: fastq
+    tuple val(sample), file("trycycler/subsample/${sample}/*fastq"),       optional: true, emit: fastq
+    tuple val(sample), file("trycycler/notsubsample/${sample}/*fastq.gz"), optional: true, emit: full
 
     shell:
     '''
-    mkdir -p trycycler/subsample/!{sample}
+    mkdir -p trycycler/subsample/!{sample} trycycler/notsubsample/!{sample}
 
     trycycler --version
 
     trycycler subsample !{params.trycycler_subsample_options} \
       --reads !{fastq} \
       --threads !{task.cpus} \
-      --out_dir trycycler/subsample/!{sample}
+      --out_dir trycycler/subsample/!{sample} || \
+      cp !{fastq} trycycler/notsubsample/!{sample}/.
     '''
 }
-
-    // num_lines=$(zcat !{fastq} | wc -l )
-    // if [ "$num_lines" -gt 40000 ]
-    // then
-    //   trycycler subsample !{params.trycycler_subsample_options} \
-    //     --reads !{fastq} \
-    //     --threads !{task.cpus} \
-    //     --out_dir trycycler/subsample/!{sample}
-    // else
-    //   echo "Not enough reads for Trycycler subsample"
-    //   cp !{fastq} trycycler/subsample/!{sample}_1.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_2.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_3.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_4.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_5.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_6.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_7.fastq.gz
-    //   cp !{fastq} trycycler/subsample/!{sample}_8.fastq.gz
-    //   fi
 
 process cluster {
   publishDir "${params.outdir}/trycycler", mode: 'copy'
@@ -114,10 +97,10 @@ process reconcile {
     then
       while read line
       do
-        cluster=$(echo $line | cut -f 1 -d ,)
-        file=$(echo $line | cut -f 2 -d ,)
+        cluster=$(echo $line | cut -f 2 -d ,)
+        file=$(echo $line | cut -f 3 -d ,)
         if [ -f "$cluster/1_contigs/$file.fasta" ] ; then mv $cluster/1_contigs/$file.fasta $cluster/1_contigs/$file.fasta_remove ; fi
-      done < !{remove}
+      done < <(grep ^!{sample}, !{remove})
     fi
 
     num_fasta=$(ls !{cluster}/1_contigs/*.fasta | wc -l)

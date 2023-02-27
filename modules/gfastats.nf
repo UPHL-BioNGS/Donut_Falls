@@ -8,10 +8,10 @@ process gfastats {
   tuple val(sample), file(gfa)
 
   output:
-  tuple val(sample), file("gfastats/${sample}_{circular,open}.fasta"), optional: true, emit: fasta
-  tuple val(sample), file("gfastats/${sample}.fasta"), optional: true, emit: assembly
+  tuple val(sample), file("gfastats/${sample}_*_{circular,open}.fasta"), optional: true, emit: fasta
+  tuple val(sample), file("gfastats/${sample}.fasta"),                   optional: true, emit: assembly
   path "gfastats/*"
-  path "gfastats/${sample}_gfastats_summary.csv",                        emit: summary
+  path "gfastats/${sample}_gfastats_summary.csv",                                      emit: summary
 
   shell:
   '''
@@ -28,11 +28,9 @@ process gfastats {
   while read line
   do
     header=$(echo $line | cut -f 2 -d ',')
-    echo "header is $header"
     length=$(echo $line | cut -f 4 -d ',')
-    echo "length is $length"
     circ=$(echo $line | cut -f 11 -d ',')
-    echo "circ is $circ"
+
     if [ "$length" -ge 200 ]
     then
       if [[ "$circ" == "Y" ]]
@@ -44,7 +42,7 @@ process gfastats {
         grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}_${header}_open.fasta
       fi
     fi
-    echo ">!{sample}_${header}" >> gfastats/!{sample}.fasta
+    echo ">!{sample}_${header} length=$length circular=$circ" >> gfastats/!{sample}.fasta
     grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}.fasta
   done < <(grep -v Header gfastats/!{sample}_gfastats.txt | tr "\\t" ",")
 
