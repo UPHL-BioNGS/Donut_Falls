@@ -13,6 +13,7 @@ process fastp {
   output:
   tuple val(sample), file("fastp/${sample}_fastp_{R1,R2}.fastq.gz"), emit: reads
   path "fastp/*"
+  path "fastp/${sample}_fastp.json",                                 emit: summary
 
   shell:
   '''
