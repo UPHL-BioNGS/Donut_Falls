@@ -1,4 +1,5 @@
 process multiqc {
+  publishDir "${params.outdir}", mode: 'copy'
   tag       "multiqc"
   container 'quay.io/biocontainers/multiqc:1.12--pyhdfd78af_0'
 
