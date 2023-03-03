@@ -26,7 +26,7 @@ process unicycler {
       -2 !{illumina[1]} \
       -l !{nanopore} \
       -o unicycler/!{sample} \
-      -t 20 
+      -t !{task.cpus} 
 
     if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta ; fi 
     '''
