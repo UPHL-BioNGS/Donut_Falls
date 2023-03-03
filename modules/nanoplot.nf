@@ -27,6 +27,7 @@ process nanoplot {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 6
+  container 'staphb/nanoplot:latest'
 
   input:
   tuple val(sample), file(fastq)
@@ -39,7 +40,7 @@ process nanoplot {
   '''
     mkdir -p nanoplot/!{sample}
 
-    NanoPlot --version | tee -a $log_file $err_file > /dev/null
+    NanoPlot --version
 
     NanoPlot !{params.nanoplot_options} \
       --fastq !{fastq} \
