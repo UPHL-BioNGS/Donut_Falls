@@ -2,9 +2,7 @@ process circlator {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  //container 'quay.io/biocontainers/circlator:1.5.5--py_3'
-  //container 'staphb/circlator:latest'
-  //container 'sangerpathogens/circlator:latest'
+  contaienr 'quay.io/uphl/circlator:1.5.5'
 
   input:
   tuple val(sample), file(fasta)
