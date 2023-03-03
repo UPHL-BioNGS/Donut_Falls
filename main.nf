@@ -8,7 +8,7 @@ println("email: eriny@utah.gov")
 println("Version: ${workflow.manifest.version}")
 println("")
 
-params.config_file                = false
+params.config_file                 = false
 if (params.config_file) {
   def src = new File("${workflow.projectDir}/configs/donut_falls_config_template.config")
   def dst = new File("${workflow.launchDir}/edit_me.config")
@@ -18,10 +18,11 @@ if (params.config_file) {
 }
 
 params.sequencing_summary          = workflow.launchDir + "/*sequencing_summary*txt"
-params.sample_sheet                = 'sample_sheet.csv'
+params.sample_sheet                = ''
 params.assembler                   = 'flye'
 params.outdir                      = 'donut_falls'
 params.remove                      = 'remove.txt'
+params.reads                       = ''
 
 params.busco_options               = ''
 params.circlator_options           = ''
@@ -61,21 +62,37 @@ Channel
   .view { "Summary File : $it" }
   .set { ch_sequencing_summary }
 
-Channel
-  .fromPath("${params.sample_sheet}", type: "file")
-  .splitCsv( header: true, sep: ',' )
-  .map { row -> tuple( "${row.sample}", file("${row.fastq}"), [file("${row.fastq_1}"), file("${row.fastq_2}") ]) }
-  .set { ch_input_files }
+if ( params.sample_sheet) {
+  Channel
+    .fromPath("${params.sample_sheet}", type: "file")
+    .splitCsv( header: true, sep: ',' )
+    .map { row -> tuple( "${row.sample}", file("${row.fastq}"), [file("${row.fastq_1}"), file("${row.fastq_2}") ]) }
+    .set { ch_input_files }
 
-Channel
-  .fromPath("${params.remove}", type: "file")
-  .set { ch_remove }
+} else if ( params.reads ) {
+  Channel
+    .fromPath("${params.reads}/*.{fastq,fastq.gz,fq,fq.gz}", type:'file')
+    .ifEmpty {
+      println("Could not find fastq files for nanopore sequencing. Set with 'params.reads'")
+      exit 1
+    }
+    .map { reads -> tuple(reads.simpleName, reads, "" ) }
+    .view { "Fastq file found : ${it[0]}" }
+    .set { ch_input_files }
+} else {
+  println("Thank you for using Donut Falls!\n")
+  println("Please set a sample sheet with params.sample_sheet or a directory with params.reads!")
+  exit 0
+}
+
+ch_remove = Channel.fromPath("${params.remove}", type: "file")
 
 workflow {
   ch_illumina    = Channel.empty()
   ch_fastq       = Channel.empty()
   ch_fasta       = Channel.empty()
   ch_consensus   = Channel.empty()
+  ch_summary     = Channel.empty()
 
   if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' ) {
     filter(ch_input_files)
@@ -84,6 +101,8 @@ workflow {
 
     assembly(filter.out.fastq)
     ch_fasta     = ch_fasta.mix(assembly.out.fasta)
+    ch_summary   = ch_summary.mix(filter.out.summary)
+
   } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
     hybrid(ch_input_files)
     ch_consensus = ch_consensus.mix(hybrid.out.fasta)
@@ -92,6 +111,7 @@ workflow {
     filter(ch_input_files)
     ch_fastq     = ch_fasta.mix(filter.out.fastq)
     ch_illumina  = ch_illumina.mix(filter.out.reads)
+    ch_summary   = ch_summary.mix(filter.out.summary)
 
     trycycler(filter.out.fastq, ch_remove.ifEmpty([]))
     ch_fasta    = ch_fasta.mix(trycycler.out.fasta)
@@ -99,10 +119,10 @@ workflow {
 
   nanoplot(ch_sequencing_summary)
   polish(ch_fastq, ch_fasta, ch_illumina.ifEmpty([]))
-
   ch_consensus = ch_consensus.mix(polish.out.fasta)
+
   metrics(
     ch_input_files.map{it -> tuple (it[0], it[1])},
     ch_consensus,
-    assembly.out.summary.ifEmpty([]))
+    ch_summary.ifEmpty([]))
 }
