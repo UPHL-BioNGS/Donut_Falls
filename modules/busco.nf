@@ -9,11 +9,10 @@ process busco {
 
   output:
   path("busco/${sample}/*")
-  path("busco/${sample}/short_summary_*.txt"), emit: summary
+  path("busco/${sample}/short_summary*.txt"), optional: true, emit: summary
 
   shell:
   '''
-    mkdir -p busco/!{sample}
     busco --version 
 
     busco !{params.busco_options} \
