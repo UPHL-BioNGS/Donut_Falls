@@ -2,7 +2,7 @@ process circlator {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  contaienr 'quay.io/uphl/circlator:1.5.5'
+  container 'quay.io/uphl/circlator:1.5.5'
 
   input:
   tuple val(sample), file(fasta)
