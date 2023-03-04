@@ -1,0 +1,6 @@
+reports:
+  multiqc_report.html:
+    display: "MultiQC report"
+  NanoStats.csv:
+    display: "NanoStats results"
+    
