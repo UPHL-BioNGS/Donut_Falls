@@ -1,4 +1,4 @@
-name: Test Donut Falls miniasm and minipolish assembly
+name: Test Donut Falls raven assembly with polishing
 
 on: [pull_request, workflow_dispatch]
 
@@ -23,7 +23,10 @@ jobs:
       - name: Run Donut Falls
         run: |
           docker --version
-          
+
           wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
 
-          nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/github_actions_sample_sheet.txt --assembler miniasm
+          mkdir reads
+          mv long_reads_low_depth.fastq.gz reads/.
+
+          nextflow run . -profile docker -c .github/workflows/github_actions.config --reads reads --assembler raven
