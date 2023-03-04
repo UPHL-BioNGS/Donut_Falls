@@ -18,8 +18,6 @@ process masurca {
     -t !{task.cpus} \
     -i !{fastq[0]},!{fastq[1]} \
     -r !{nanopore} 
-  
-  exit 1
   '''
 }
 
