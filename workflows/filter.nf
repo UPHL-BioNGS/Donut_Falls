@@ -8,7 +8,7 @@ workflow filter {
     ch_input
 
     main:
-    fastp(ch_input.map { it -> tuple (it[0], it[2])})
+    fastp(ch_input.map { it -> tuple (it[0], it[2])}.filter( it[2] ~/.f*/ ))
     porechop(ch_input.map {it -> tuple (it[0], it[1])})
     filtlong(porechop.out.fastq.join(fastp.out.reads, by: 0, remainder: true))
     bgzip(filtlong.out.fastq)
