@@ -1,4 +1,4 @@
-name: Test Donut Falls raven assembly with polishing
+name: Test Donut Falls raven assembly from directory
 
 on: [pull_request, workflow_dispatch]
 
