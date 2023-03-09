@@ -3,6 +3,7 @@ process busco {
   tag "${sample}"
   cpus 1
   container 'ezlabgva/busco:v5.4.5_cv1'
+  errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(fasta)

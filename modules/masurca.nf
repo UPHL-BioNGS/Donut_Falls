@@ -1,23 +1,35 @@
 process masurca {
   publishDir "${params.outdir}", mode: 'copy'
+  stageInMode 'copy'
+
   tag "${sample}"
   cpus 12
   container 'staphb/masurca:latest'
 
   input:
-  tuple val(sample), file(fastq), file(nanopore)
+  tuple val(sample), file(nanopore), file(fastq)
 
   output:
-  path "masura/${sample}"
+  path "masurca/${sample}"
+  tuple val(sample), file("masruca/${sample}.fasta"), emit: fasta
 
   shell:
   '''
   masurca --version
 
+# The same error with 4.0.4 with Illumina and nanopore data
+# Upd package numactl must be installed.
+# see https://github.com/alekseyzimin/masurca/issues/239
+
+  gunzip !{fastq[0]}
+  gunzip !{fastq[1]}
+
   masurca !{params.masurca_options} \
     -t !{task.cpus} \
-    -i !{fastq[0]},!{fastq[1]} \
-    -r !{nanopore} 
+    -i $(echo !{fastq[0]} | sed 's/.gz$//g'),$(echo !{fastq[1]}  | sed 's/.gz$//g') \
+    -r !{nanopore}
+
+  exit 1
   '''
 }
 
@@ -31,57 +43,24 @@ process polca {
   tuple val(sample), file(fasta), file(fastq)
 
   output:
-  tuple val(sample), file("polca/${sample}_final.fa"), emit: fasta
-  path "polca/${sample}",                              emit: directory
+  tuple val(sample), file("polca/${sample}/${sample}_polca_polished.fa"), optional: true, emit: fasta
+  path "polca/${sample}/*",                                                               emit: directory
 
   shell:
   '''
-    mkdir -p round_{1,2,3,4,5} polca/!{sample}
+    mkdir -p polca/!{sample}
 
     masurca --version
 
+    cp !{fasta} !{sample}.fasta
+
     polca.sh !{params.polca_options} \
       -r '!{fastq}' \
-      -a !{fasta} \
+      -a !{sample}.fasta \
       -t !{task.cpus} 
 
-    # there was going to be something fancy, but this is here instead
-    mv !{fasta}.* round_1/.
-    cp round_1/!{fasta}.PolcaCorrected.fa !{sample}_round1.fa
+    mv !{sample}.fasta* polca/!{sample}/.
 
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round1.fa \
-      -t !{task.cpus}
-
-    mv !{sample}_round1.fa.* round_2/.
-    cp round_2/!{sample}_round1.fa.PolcaCorrected.fa !{sample}_round2.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round2.fa \
-      -t !{task.cpus} 
-
-    mv !{sample}_round2.fa.* round_3/.
-    cp round_3/!{sample}_round2.fa.PolcaCorrected.fa !{sample}_round3.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round3.fa \
-      -t !{task.cpus} 
-
-    mv !{sample}_round3.fa.* round_4/.
-    cp round_4/!{sample}_round3.fa.PolcaCorrected.fa !{sample}_round4.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round4.fa \
-      -t !{task.cpus} 
-
-    mv !{sample}_round4.fa.* round_5/.
-    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa !{sample}_round5.fa
-    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa polca/!{sample}_final.fa
-    
-    mv round_* polca/!{sample}/.
+    if [ -f "polca/!{sample}/!{sample}.fasta.PolcaCorrected.fa" ] ; then cp polca/!{sample}/!{sample}.fasta.PolcaCorrected.fa polca/!{sample}/!{sample}_polca_polished.fa ; fi
   '''
 }
