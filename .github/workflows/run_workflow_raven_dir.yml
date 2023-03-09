@@ -24,9 +24,11 @@ jobs:
         run: |
           docker --version
 
-          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
+          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
 
           mkdir reads
-          mv long_reads_low_depth.fastq.gz reads/.
+          mv long_reads_high_depth.fastq.gz reads/.
 
           nextflow run . -profile docker -c .github/workflows/github_actions.config --reads reads --assembler raven
+
+          tree
