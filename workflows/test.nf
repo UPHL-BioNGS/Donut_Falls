@@ -1,6 +1,6 @@
 include { download } from './modules/download' addParams(params)
 
-workflow metrics {
+workflow download {
     input:
     ch_sra_accessions
 
