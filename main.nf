@@ -67,15 +67,15 @@ if ( params.sample_sheet) {
   Channel
     .fromPath("${params.sample_sheet}", type: "file")
     .splitCsv( header: true, sep: ',' )
-    .map { row -> tuple( "${row.sample}", "${row.fastq}", ["${row.fastq_1}", "${row.fastq_2}" ]) }
-    .branch { sample, ont, illumina ->
-      sr:  illumina[0] 
+    .map { row -> tuple( "${row.sample}", "${row.fastq}", "${row.fastq_1}", "${row.fastq_2}" ) }
+    .branch { it ->
+      sr:  it[2]
       other: true
     }
     .set{ch_precheck}
 
-    ch_precheck.sr.map { row -> tuple(row[0], file(row[1]), [file(row[2][0]), file(row[2][1])])}
-      .mix(ch_precheck.other.map { row -> tuple(row[0], file(row[1]), null)})
+    ch_precheck.sr.map { it -> tuple(it[0], file(it[1]), [file(it[2]), file(it[3])])}
+      .mix(ch_precheck.other.map { it -> tuple(it[0], file(it[1]), null)})
       .set{ch_input_files}
 
 } else if ( params.reads ) {
