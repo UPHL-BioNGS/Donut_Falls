@@ -36,6 +36,7 @@ params.multiqc_options             = ''
 params.nanoplot_summary_options    = ''
 params.nanoplot_options            = ''
 params.polca_options               = ''
+params.polypolish_options          = ''
 params.porechop_options            = ''
 params.quast_options               = ''
 params.rasusa_options              = '--frac 80'
@@ -66,8 +67,16 @@ if ( params.sample_sheet) {
   Channel
     .fromPath("${params.sample_sheet}", type: "file")
     .splitCsv( header: true, sep: ',' )
-    .map { row -> tuple( "${row.sample}", file("${row.fastq}"), [file("${row.fastq_1}"), file("${row.fastq_2}") ]) }
-    .set { ch_input_files }
+    .map { row -> tuple( "${row.sample}", "${row.fastq}", ["${row.fastq_1}", "${row.fastq_2}" ]) }
+    .branch { sample, ont, illumina ->
+      sr:  illumina[0] 
+      other: true
+    }
+    .set{ch_precheck}
+
+    ch_precheck.sr.map { row -> tuple(row[0], file(row[1]), [file(row[2][0]), file(row[2][1])])}
+      .mix(ch_precheck.other.map { row -> tuple(row[0], file(row[1]), null)})
+      .set{ch_input_files}
 
 } else if ( params.reads ) {
   Channel
@@ -76,7 +85,7 @@ if ( params.sample_sheet) {
       println("Could not find fastq files for nanopore sequencing. Set with 'params.reads'")
       exit 1
     }
-    .map { reads -> tuple(reads.simpleName, reads, "" ) }
+    .map { reads -> tuple(reads.simpleName, reads, null ) }
     .view { "Fastq file found : ${it[0]}" }
     .set { ch_input_files }
 } else {
@@ -104,7 +113,7 @@ workflow {
     ch_summary   = ch_summary.mix(filter.out.summary)
 
   } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
-    hybrid(ch_input_files)
+    hybrid(ch_input_files.filter{it -> it[2]})
     ch_consensus = ch_consensus.mix(hybrid.out.fasta)
 
   } else if ( params.assembler == 'trycycler' ) {
