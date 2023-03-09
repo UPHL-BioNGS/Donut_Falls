@@ -28,4 +28,4 @@ jobs:
 
           nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/github_actions_hd_sample_sheet.txt --assembler miniasm
 
-          tree
+          tree donut_falls

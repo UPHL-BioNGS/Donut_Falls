@@ -31,4 +31,4 @@ jobs:
 
           nextflow run . -profile docker -c .github/workflows/github_actions.config --reads reads --assembler raven
 
-          tree
+          tree donut_falls
