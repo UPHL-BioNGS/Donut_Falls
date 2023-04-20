@@ -26,6 +26,7 @@ params.reads                       = ''
 
 params.busco_options               = ''
 params.circlator_options           = ''
+params.enable_porechop             = false
 params.fastp_options               = ''
 params.filtlong_options            = '--min_length 1000 --keep_percent 95'
 params.flye_options                = ''
@@ -67,10 +68,10 @@ if ( params.sample_sheet) {
   Channel
     .fromPath("${params.sample_sheet}", type: "file")
     .splitCsv( header: true, sep: ',' )
-    .map { row -> tuple( "${row.sample}", "${row.fastq}", "${row.fastq_1}", "${row.fastq_2}" ) }
+    .map { it -> tuple( "${it.sample}", "${it.fastq}", "${it.fastq_1}", "${it.fastq_2}" ) }
     .branch { it ->
-      sr:  it[2]
-      other: true
+       sr:  it[2] != it[3]
+       other: true
     }
     .set{ch_precheck}
 
