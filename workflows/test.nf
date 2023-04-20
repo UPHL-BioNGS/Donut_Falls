@@ -1,12 +1,18 @@
-include { download } from './modules/download' addParams(params)
+include { download      } from '../modules/download' addParams(params)
+include { great_dataset } from '../modules/download' addParams(params)
 
-workflow download {
+workflow test {
     input:
-    ch_sra_accessions
 
     main:
-    download(ch_sra_accessions)
+    if ( params.assembler == 'trycycler' ) { 
+        great_dataset()
+        fastq = great_dataset.out.fastq
+    } else { 
+        download()
+        fastq = download.out.fastq
+    }
 
     emit:
-    fastq = download.out.fastq
+    fastq = fastq
 }
