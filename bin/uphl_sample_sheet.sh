@@ -91,7 +91,7 @@ fi
 if [ -z "$(which parallel)" ] ; then echo "$(date) : FATAL : parallel is not in PATH" ; exit 1 ; fi
 
 echo "$(date): Concenating fastq.gz files and renaming"
-#cat $sample_key | parallel --colsep "," $jobs "cat $pass/{2}/*fastq.gz > $combined/{1}.fastq.gz"
+cat $sample_key | parallel --colsep "," $jobs "cat $pass/{2}/*fastq.gz > $combined/{1}.fastq.gz"
 
 echo "sample,fastq,fastq_1,fastq_2" > sample_sheet.csv
 
