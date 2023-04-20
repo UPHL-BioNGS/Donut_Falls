@@ -31,4 +31,4 @@ jobs:
 
           #nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/github_actions_hybrid_sample_sheet.txt --assembler masurca
 
-          tree donut_falls
+          #tree donut_falls
