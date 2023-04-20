@@ -129,6 +129,12 @@
             "description": "input channel for nanopore sequencing summary file (optional)",
             "hidden": false
         },
+        "test_wf":{
+            "type": "boolean",
+            "description": "Downloads test file",
+            "default": false,
+            "hidden": true
+        },
         "trycycler_cluster_options":{
             "type" : "string",
             "description": "Options for process",
@@ -143,6 +149,12 @@
             "type" : "string",
             "description": "Options for process",
             "hidden": true
+        },
+        "trycycler_min_fasta": {
+            "type": "integer",
+            "description": "The minimum number of fastas needed for Trycycler reconcile",
+            "hidden": true,
+            "default": 6
         },
         "trycycler_msa_options":{
             "type" : "string",
