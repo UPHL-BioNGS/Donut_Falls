@@ -10,11 +10,12 @@ workflow filter {
     main:
     fastp(ch_input.filter({ it[2] }).map { it -> tuple (it[0], it[2])})
 
-    if (params.enable_porechop = true ):
+    if (params.enable_porechop = true ) {
         porechop(ch_input.map {it -> tuple (it[0], it[1])})
         filtlong(porechop.out.fastq.join(fastp.out.reads, by: 0, remainder: true))
-    else:
+    } else {
         filtlong(ch_input.map {it -> tuple (it[0], it[1])}.join(fastp.out.reads, by: 0, remainder: true))
+    }
 
     bgzip(filtlong.out.fastq)
 
