@@ -2,7 +2,7 @@ process gfastats {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'quay.io/biocontainers/gfastats:1.3.6--hd03093a_1'
+  container 'staphb/gfastats:1.3.6'
 
   input:
   tuple val(sample), file(gfa)

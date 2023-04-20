@@ -1,7 +1,7 @@
 process polypolish {
   tag "${sample}"
   cpus 6
-  container 'quay.io/biocontainers/polypolish:0.5.0--h87f3376_2'
+  container 'quay.io/biocontainers/polypolish:0.5.0'
   publishDir "${params.outdir}", mode: 'copy'
 
   input:

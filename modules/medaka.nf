@@ -2,7 +2,7 @@ process medaka {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 6
-  container 'ontresearch/medaka:v1.7.2'
+  container 'ontresearch/medaka:v1.7.3'
 
   input:
   tuple val(sample), path(fasta), path(fastq)

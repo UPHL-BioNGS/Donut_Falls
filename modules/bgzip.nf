@@ -2,7 +2,7 @@ process bgzip {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/htslib:1.15'
+  container 'staphb/htslib:1.17'
 
   input:
   tuple val(sample), file(fastq)

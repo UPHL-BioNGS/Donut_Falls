@@ -1,7 +1,7 @@
 process bwa {
   tag "${sample}"
   label "maxcpus"
-  container 'staphb/bwa:latest'
+  container 'staphb/bwa:0.7.17'
   cpus 6
 
   input:

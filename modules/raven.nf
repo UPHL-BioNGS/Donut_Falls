@@ -2,7 +2,7 @@ process raven {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 12
-  container 'staphb/raven:latest'
+  container 'staphb/raven:1.8.1'
   errorStrategy 'ignore'
 
   input:

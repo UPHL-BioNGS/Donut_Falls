@@ -4,7 +4,7 @@ process masurca {
 
   tag "${sample}"
   cpus 12
-  container 'staphb/masurca:latest'
+  container 'staphb/masurca:4.1.0'
 
   input:
   tuple val(sample), file(nanopore), file(fastq)

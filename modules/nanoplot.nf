@@ -2,7 +2,7 @@ process nanoplot_summary {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sequencing_summary}"
   cpus 6
-  container 'staphb/nanoplot:latest'
+  container 'staphb/nanoplot:1.40.0'
 
   input:
   file(sequencing_summary)
@@ -27,7 +27,7 @@ process nanoplot {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 6
-  container 'staphb/nanoplot:latest'
+  container 'staphb/nanoplot:1.40.0'
 
   input:
   tuple val(sample), file(fastq)

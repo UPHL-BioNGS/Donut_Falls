@@ -2,7 +2,7 @@ process rasusa {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 6
-  container 'quay.io/biocontainers/rasusa:0.7.0--hec16e2b_1'
+  container 'staphb/rasusa:0.7.0'
 
   input:
   tuple val(sample), file(fastq)

@@ -2,7 +2,7 @@ process flye {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 12
-  container 'staphb/flye:latest'
+  container 'staphb/flye:2.9.2'
   errorStrategy 'ignore'
 
   input:

@@ -2,7 +2,7 @@ process porechop {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 6
-  container 'quay.io/biocontainers/porechop:0.2.4--py310h30d9df9_3'
+  container 'staphb/porechop:0.2.4'
 
   input:
   tuple val(sample), file(fastq)

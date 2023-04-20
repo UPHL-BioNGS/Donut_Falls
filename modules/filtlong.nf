@@ -2,7 +2,7 @@ process filtlong {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'staphb/filtlong:latest'
+  container 'staphb/filtlong:0.2.1'
 
   input:
   tuple val(sample), file(fastq), file(short_reads)

@@ -2,7 +2,7 @@
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 12
-  container 'staphb/minipolish:latest'
+  container 'staphb/minipolish:0.1.3'
 
   input:
   tuple val(sample), file(fastq)

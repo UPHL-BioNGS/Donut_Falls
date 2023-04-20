@@ -2,7 +2,7 @@ process unicycler {
   tag "${sample}"
   cpus 12
   publishDir "${params.outdir}", mode: 'copy'
-  container 'staphb/unicycler:latest'
+  container 'staphb/unicycler:0.5.0'
   errorStrategy 'ignore'
 
   when:
@@ -36,7 +36,7 @@ process unicycler_long {
   tag "${sample}"
   cpus 12
   publishDir "${params.outdir}", mode: 'copy'
-  container 'staphb/unicycler:latest'
+  container 'staphb/unicycler:0.5.0'
   errorStrategy 'ignore'
 
   input:

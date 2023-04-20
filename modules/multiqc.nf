@@ -1,7 +1,7 @@
 process multiqc {
   publishDir "${params.outdir}", mode: 'copy'
   tag       "multiqc"
-  container 'quay.io/biocontainers/multiqc:1.12--pyhdfd78af_0'
+  container 'quay.io/biocontainers/multiqc:1.14--pyhdfd78af_0'
 
   //fastp
   //filtlong
