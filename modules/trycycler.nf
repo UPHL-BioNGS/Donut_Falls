@@ -2,7 +2,7 @@ process subsample {
     publishDir "${params.outdir}", mode: 'copy'
     tag "${sample}"
     cpus 12
-    container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+    container 'staphb/trycycler:0.5.4'
 
     input:
     tuple val(sample), file(fastq)
@@ -29,7 +29,7 @@ process cluster {
   publishDir "${params.outdir}/trycycler", mode: 'copy'
   tag "${sample}"
   cpus 12
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), file(fasta), file(fastq)
@@ -56,7 +56,7 @@ process dotplot {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}_${cluster}"
   cpus 1
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), path(cluster)
@@ -81,7 +81,7 @@ process reconcile {
   tag "${sample}_${cluster}"
   cpus 12
   //errorStrategy 'finish'
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), path(cluster), file(fastq), file(remove)
@@ -105,7 +105,7 @@ process reconcile {
 
     num_fasta=$(ls !{cluster}/1_contigs/*.fasta | wc -l)
     echo "There are $num_fasta in !{cluster} for !{sample}"
-    if [ "$num_fasta" -ge "4" ]
+    if [ "$num_fasta" -ge "!{params.trycycler_min_fasta}" ]
     then
       trycycler reconcile !{params.trycycler_reconcile_options} \
         --reads !{fastq} \
@@ -113,6 +113,8 @@ process reconcile {
         --threads !{task.cpus}
 
         ls
+
+        echo "There are $num_fasta in !{cluster} for !{sample}"
 
         ls !{cluster}/2_all_seqs.fasta
     else
@@ -125,7 +127,7 @@ process reconcile {
 process msa {
   tag "${sample}_${cluster}"
   cpus 12
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), path(cluster)
@@ -146,7 +148,7 @@ process msa {
 process partition {
   tag "${sample}_${cluster}"
   cpus 12
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), path(cluster), file(fastq)
@@ -169,7 +171,7 @@ process consensus {
   publishDir "${params.outdir}/trycycler/${sample}", mode: 'copy'
   tag "${sample}_${cluster}"
   cpus 12
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), path(cluster)
@@ -194,7 +196,7 @@ process combine {
   publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
-  container 'quay.io/biocontainers/trycycler:0.5.3--pyhdfd78af_0'
+  container 'staphb/trycycler:0.5.4'
 
   input:
   tuple val(sample), file(fasta)
