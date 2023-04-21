@@ -1,0 +1,2 @@
+sample,fastq,fastq_1,fastq_2
+test,long_reads_high_depth.fastq.gz,,

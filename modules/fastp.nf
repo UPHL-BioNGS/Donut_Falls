@@ -1,35 +1,33 @@
 process fastp {
+  publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
+  container 'staphb/fastp:0.23.2'
+
+  when:
+  sample != null
 
   input:
-  tuple val(sample), file(fastq), file(nanopore)
+  tuple val(sample), file(reads)
 
   output:
-  tuple val(sample), file("fastp/${sample}_{R1,R2}.fastq.gz"), emit: reads
-  path "fastp/*"                                             , emit: directory
-  path "logs/fastp/${sample}.${workflow.sessionId}.{log,err}", emit: logs
+  tuple val(sample), file("fastp/${sample}_fastp_{R1,R2}.fastq.gz"), emit: reads
+  path "fastp/*"
+  path "fastp/${sample}_fastp.json",                                 emit: summary
 
   shell:
   '''
-    mkdir -p fastp logs/fastp
-    log_file=logs/fastp/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/fastp/!{sample}.!{workflow.sessionId}.err
+  mkdir -p fastp 
+  fastp --version 
 
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    fastp --version >> $log_file 2>> $err_file
-
-    fastp !{params.fastp_options} \
-      --in1 !{fastq[0]} \
-      --in2 !{fastq[1]} \
-      --out1 fastp/!{sample}_R1.fastq.gz \
-      --out2 fastp/!{sample}_R2.fastq.gz \
-      --unpaired1 fastp/!{sample}_u.fastq.gz \
-      --unpaired2 fastp/!{sample}_u.fastq.gz \
-      2>> $err_file >> $log_file
-
-    cp *.html fastp/.
-    cp *.json fastp/.
+  fastp !{params.fastp_options} \
+    --in1 !{reads[0]} \
+    --in2 !{reads[1]} \
+    --out1 fastp/!{sample}_fastp_R1.fastq.gz \
+    --out2 fastp/!{sample}_fastp_R2.fastq.gz \
+    --unpaired1 fastp/!{sample}_u.fastq.gz \
+    --unpaired2 fastp/!{sample}_u.fastq.gz \
+    -h fastp/!{sample}_fastp.html \
+    -j fastp/!{sample}_fastp.json
   '''
 }

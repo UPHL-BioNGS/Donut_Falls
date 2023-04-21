@@ -1,77 +1,66 @@
+process masurca {
+  publishDir "${params.outdir}", mode: 'copy'
+  stageInMode 'copy'
+
+  tag "${sample}"
+  cpus 12
+  container 'staphb/masurca:4.1.0'
+
+  input:
+  tuple val(sample), file(nanopore), file(fastq)
+
+  output:
+  path "masurca/${sample}"
+  tuple val(sample), file("masruca/${sample}.fasta"), emit: fasta
+
+  shell:
+  '''
+  masurca --version
+
+# The same error with 4.0.4 with Illumina and nanopore data
+# Upd package numactl must be installed.
+# see https://github.com/alekseyzimin/masurca/issues/239
+
+  gunzip !{fastq[0]}
+  gunzip !{fastq[1]}
+
+  masurca !{params.masurca_options} \
+    -t !{task.cpus} \
+    -i $(echo !{fastq[0]} | sed 's/.gz$//g'),$(echo !{fastq[1]}  | sed 's/.gz$//g') \
+    -r !{nanopore}
+
+  exit 1
+  '''
+}
+
 process polca {
   tag "${sample}"
   cpus 6
+  container 'staphb/masurca:latest'
+  publishDir "${params.outdir}", mode: 'copy'
 
   input:
   tuple val(sample), file(fasta), file(fastq)
 
   output:
-  tuple val(sample), file("polca/${sample}_final.fa"),      emit: fasta
-  path "polca/${sample}",                                      emit: directory
-  path "logs/polca/${sample}.${workflow.sessionId}.{log,err}", emit: logs
+  tuple val(sample), file("polca/${sample}/${sample}_polca_polished.fa"), optional: true, emit: fasta
+  path "polca/${sample}/*",                                                               emit: directory
 
   shell:
   '''
-    mkdir -p logs/polca polca/!{sample}
-    log_file=logs/polca/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/polca/!{sample}.!{workflow.sessionId}.err
+    mkdir -p polca/!{sample}
 
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    masurca --version >> $log_file
+    masurca --version
+
+    cp !{fasta} !{sample}.fasta
 
     polca.sh !{params.polca_options} \
       -r '!{fastq}' \
-      -a !{fasta} \
-      -t !{task.cpus} \
-      2>> $err_file >> $log_file
+      -a !{sample}.fasta \
+      -t !{task.cpus} 
 
-    # there was going to be something fancy, but this is here instead
-    mkdir round_1
-    mv !{fasta}.* round_1/.
-    cp round_1/!{fasta}.PolcaCorrected.fa !{sample}_round1.fa
+    mv !{sample}.fasta* polca/!{sample}/.
 
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round1.fa \
-      -t !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    mkdir round_2
-    mv !{sample}_round1.fa.* round_2/.
-    cp round_2/!{sample}_round1.fa.PolcaCorrected.fa !{sample}_round2.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round2.fa \
-      -t !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    mkdir round_3
-    mv !{sample}_round2.fa.* round_3/.
-    cp round_3/!{sample}_round2.fa.PolcaCorrected.fa !{sample}_round3.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round3.fa \
-      -t !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    mkdir round_4
-    mv !{sample}_round3.fa.* round_4/.
-    cp round_4/!{sample}_round3.fa.PolcaCorrected.fa !{sample}_round4.fa
-
-    polca.sh !{params.polca_options} \
-      -r '!{fastq}' \
-      -a !{sample}_round4.fa \
-      -t !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    mkdir round_5
-    mv !{sample}_round4.fa.* round_5/.
-    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa !{sample}_round5.fa
-    cp round_5/!{sample}_round4.fa.PolcaCorrected.fa polca/!{sample}_final.fa
-    
-    mv round_* polca/!{sample}/.
+    if [ -f "polca/!{sample}/!{sample}.fasta.PolcaCorrected.fa" ] ; then cp polca/!{sample}/!{sample}.fasta.PolcaCorrected.fa polca/!{sample}/!{sample}_polca_polished.fa ; fi
   '''
 }

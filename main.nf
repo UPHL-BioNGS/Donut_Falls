@@ -1,14 +1,14 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
-version = "0.0.20220810"
+
 
 println("Currently using the Donut Falls workflow for use with nanopore sequencing\n")
 println("Author: Erin Young")
 println("email: eriny@utah.gov")
-println("Version:" + version)
+println("Version: ${workflow.manifest.version}")
 println("")
 
-params.config_file                = false
+params.config_file                 = false
 if (params.config_file) {
   def src = new File("${workflow.projectDir}/configs/donut_falls_config_template.config")
   def dst = new File("${workflow.launchDir}/edit_me.config")
@@ -17,75 +17,140 @@ if (params.config_file) {
   exit 0
 }
 
+params.sequencing_summary          = workflow.launchDir + "/*sequencing_summary*txt"
+params.sample_sheet                = ''
+params.assembler                   = 'flye'
+params.outdir                      = 'donut_falls'
+params.remove                      = 'remove.txt'
+params.reads                       = ''
+params.test_wf                     = false
 
-//# TODO : add circlator
-//# TODO : add something to evaluate fastas
-//# TODO : add summary file
-//# TODO : add trycycler
-//# TODO : add multiqc
-//# TODO : metric subworkflow
+params.busco_options               = ''
+params.circlator_options           = ''
+params.enable_porechop             = false
+params.fastp_options               = ''
+params.filtlong_options            = '--min_length 1000 --keep_percent 95'
+params.flye_options                = ''
+params.gfastats_options            = ''
+params.masurca_options             = ''
+params.medaka_options              = ''
+params.multiqc_options             = ''
+params.nanoplot_summary_options    = ''
+params.nanoplot_options            = ''
+params.polca_options               = ''
+params.polypolish_options          = ''
+params.porechop_options            = ''
+params.quast_options               = ''
+params.rasusa_options              = '--frac 80'
+params.raven_options               = '--polishing-rounds 2'
+params.trycycler_subsample_options = ''
+params.trycycler_cluster_options   = ''
+params.trycycler_consensus_options = ''
+params.trycycler_dotplot_options   = ''
+params.trycycler_min_fasta         = 6
+params.trycycler_msa_options       = ''
+params.trycycler_partition_options = ''
+params.trycycler_reconcile_options = ''
+params.unicycler_options           = ''
 
-params.sequencing_summary         = workflow.launchDir + "/*sequencing_summary*txt"
-params.reads                      = workflow.launchDir + '/reads'
-params.illumina                   = workflow.launchDir + '/illumina'
-params.assembler                  = 'flye'
-params.outdir                     = 'donut_falls'
-
-params.nanoplot_summary_options   = ''
-params.nanoplot_options           = ''
-params.nanoplot_illumina_options  = ''
-params.unicycler_options          = ''
-params.raven_options              = '--polishing-rounds 2'
-params.flye_options               = ''
-params.filtlong_options           = '--min_length 1000 --keep_percent 95'
-params.medaka_options             = ''
-params.polca_options              = ''
-params.fastp_options              = ''
-
-include { donut_falls }                                   from './workflows/donut_falls.nf' addParams(assembler: params.assembler,
-                                                                                            raven_options: params.raven_options,
-                                                                                            flye_options: params.flye_options,
-                                                                                            polca_options: params.polca_options,
-                                                                                            medaka_options: params.medaka_options,
-                                                                                            filtlong_options: params.filtlong_options,
-                                                                                            fastp_options: params.fastp_options)
-include { hybrid }                                        from './workflows/unicycler.nf'   addParams(unicycler_options: params.unicycler_options)
-include { nanoplot; nanoplot_summary; nanoplot_illumina } from './modules/nanoplot.nf'      addParams(nanoplot_options: params.nanoplot_options,
-                                                                                            nanoplot_summary_options: params.nanoplot_summary_options,
-                                                                                            nanoplot_illumina_options: params.nanoplot_illumina_options)
+include { assembly }                     from './workflows/assembly'  addParams(params)
+include { filter }                       from './workflows/filter'    addParams(params)
+include { hybrid }                       from './workflows/hybrid'    addParams(params)
+include { nanoplot_summary as nanoplot } from './modules/nanoplot'    addParams(params)
+include { metrics }                      from './workflows/metrics'   addParams(params)
+include { polish }                       from './workflows/polish'    addParams(params)
+include { test }                         from './workflows/test'      addParams(params)
+include { trycycler }                    from './workflows/trycycler' addParams(params)
 
 Channel
   .fromPath(params.sequencing_summary, type:'file')
   .view { "Summary File : $it" }
-  .set { sequencing_summary }
+  .set { ch_sequencing_summary }
 
-Channel
-  .fromPath("${params.reads}/*.{fastq,fastq.gz,fq,fq.gz}", type:'file')
-  .ifEmpty {
-    println("Could not find fastq files for nanopore sequencing. Set with 'params.reads'")
-    exit 1
-  }
-  .map { reads -> tuple(reads.simpleName, reads ) }
-  .view { "Fastq file found : ${it[0]}" }
-  .set { fastq }
+if ( params.test_wf ) {
+  println("Let's test this!\n")
+  ch_input_files = Channel.empty()
+} else if ( params.sample_sheet) {
+  Channel
+    .fromPath("${params.sample_sheet}", type: "file")
+    .splitCsv( header: true, sep: ',' )
+    .map { it -> tuple( "${it.sample}", "${it.fastq}", "${it.fastq_1}", "${it.fastq_2}" ) }
+    .branch { it ->
+       sr:  it[2] != it[3]
+       other: true
+    }
+    .set{ch_precheck}
 
-Channel
-  .fromFilePairs("${params.illumina}/*_R{1,2}*.{fastq,fastq.gz}", size: 2 )
-  .map { reads -> tuple(reads[0].replaceAll(~/_S[0-9]+_L[0-9]+/,""), reads[1]) }
-  .view { "Illumina fastq files for for greater accuracy : ${it[0]}" }
-  .set { illumina_fastq }
+    ch_precheck.sr.map { it -> tuple(it[0], file(it[1]), [file(it[2]), file(it[3])])}
+      .mix(ch_precheck.other.map { it -> tuple(it[0], file(it[1]), null)})
+      .set{ch_input_files}
+
+} else if ( params.reads ) {
+  Channel
+    .fromPath("${params.reads}/*.{fastq,fastq.gz,fq,fq.gz}", type:'file')
+    .ifEmpty {
+      println("Could not find fastq files for nanopore sequencing. Set with 'params.reads'")
+      exit 1
+    }
+    .map { reads -> tuple(reads.simpleName, reads, null ) }
+    .view { "Fastq file found : ${it[0]}" }
+    .set { ch_input_files }
+} else {
+  println("Thank you for using Donut Falls!\n")
+  println("Please set a sample sheet with params.sample_sheet or a directory with params.reads!")
+  exit 0
+}
+
+ch_remove = Channel.fromPath("${params.remove}", type: "file")
 
 workflow {
-  nanoplot(fastq)
-  nanoplot_illumina(illumina_fastq)
-  nanoplot_summary(sequencing_summary)
-  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' ) {
-    donut_falls(fastq, illumina_fastq)
-  } else if ( params.assembler == 'unicycler' ) {
-    hybrid(fastq.join(illumina_fastq, by: 0))
+  ch_illumina    = Channel.empty()
+  ch_fastq       = Channel.empty()
+  ch_fasta       = Channel.empty()
+  ch_consensus   = Channel.empty()
+  ch_summary     = Channel.empty()
+
+
+
+  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' ) {
+    if ( params.test_wf ) {
+      test()
+      ch_input_files = ch_input_files.mix(test.out.fastq)
+    }
+    
+    filter(ch_input_files)
+    ch_fastq     = ch_fasta.mix(filter.out.fastq)
+    ch_illumina  = ch_illumina.mix(filter.out.reads)
+
+    assembly(filter.out.fastq)
+    ch_fasta     = ch_fasta.mix(assembly.out.fasta)
+    ch_summary   = ch_summary.mix(filter.out.summary)
+
+  } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
+    hybrid(ch_input_files.filter{it -> it[2]})
+    ch_consensus = ch_consensus.mix(hybrid.out.fasta)
+
+  } else if ( params.assembler == 'trycycler' ) {
+    if ( params.test_wf ) {
+      test()
+      ch_input_files = ch_input_files.mix(test.out.fastq)
+    }
+
+    filter(ch_input_files)
+    ch_fastq     = ch_fasta.mix(filter.out.fastq)
+    ch_illumina  = ch_illumina.mix(filter.out.reads)
+    ch_summary   = ch_summary.mix(filter.out.summary)
+
+    trycycler(filter.out.fastq, ch_remove.ifEmpty([]))
+    ch_fasta    = ch_fasta.mix(trycycler.out.fasta)
   }
 
-  nanoplot.out.summary.collectFile(name: "NanoStats.csv",
-    keepHeader: true,
-    storeDir: "${params.outdir}/nanoplot")
+  nanoplot(ch_sequencing_summary)
+  polish(ch_fastq, ch_fasta, ch_illumina.ifEmpty([]))
+  ch_consensus = ch_consensus.mix(polish.out.fasta)
+
+  metrics(
+    ch_input_files.map{it -> tuple (it[0], it[1])},
+    ch_consensus,
+    ch_summary.ifEmpty([]))
 }

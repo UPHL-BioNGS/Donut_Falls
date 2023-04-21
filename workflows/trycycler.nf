@@ -1,245 +1,52 @@
-#!/usr/bin/env nextflow
+include { assembly as flye_assembly }                                         from './assembly'           addParams(assembler: 'flye' )
+include { assembly as miniasm_assembly }                                      from './assembly'           addParams(assembler: 'miniasm' )
+include { assembly as raven_assembly }                                        from './assembly'           addParams(assembler: 'raven')
+include { assembly as unicycler_assembly }                                    from './assembly'           addParams(assembler: 'lr_unicycler')
+include { cluster; consensus; dotplot; msa; partition; reconcile; subsample } from '../modules/trycycler' addParams(params)
+include { combine }                                                           from '../modules/trycycler' addParams(params)
+include { rasusa }                                                            from '../modules/rasusa'    addParams(params)
 
-println("Currently using the Donut Falls workflow for use with nanopore sequencing\n")
-println("Author: Erin Young")
-println("email: eriny@utah.gov")
-println("Version: v.20220430")
-println("")
+workflow trycycler {
+    take:
+    ch_fastq
+    ch_remove
 
-params.clustered_assemblies = workflow.launchDir + '/donut_falls/trycycler_cluster'
-println("Directory for clustered assemblies:" + params.clustered_assemblies)
+    main:
+    subsample(ch_fastq)
+    rasusa(subsample.out.full)
 
-params.outdir = workflow.launchDir + '/three_sisters'
+    subsample.out.fastq
+        .mix(rasusa.out.fastq)
+        .multiMap { it ->
+           flye:      tuple (it[0], it[0] + '_flye',      [it[1][1], it[1][5], it[1][9]])
+           miniasm:   tuple (it[0], it[0] + '_miniasm',   [it[1][2], it[1][6], it[1][10]])
+           raven:     tuple (it[0], it[0] + '_raven',     [it[1][3], it[1][7], it[1][11]])
+           unicycler: tuple (it[0], it[0] + '_unicycler', [it[1][4], it[1][8], it[1][0]])
+        }
+        .set { ch_subsampled }
 
-Channel
-  .fromPath("${params.clustered_assemblies}/*", type:'dir')
-  .ifEmpty {
-    println("Could not find fastq pass directories. Set with 'params.fastq_pass_directory'")
-    exit 1
-  }
-//  .map()
-  .view()
-  .into {clustered_assemblies, clustered_assemblies_dotplot}
+    flye_assembly(ch_subsampled.flye.transpose().map           { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    miniasm_assembly(ch_subsampled.miniasm.transpose().map     { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    raven_assembly(ch_subsampled.raven.transpose().map         { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
+    unicycler_assembly(ch_subsampled.unicycler.transpose().map { it -> tuple( it[1] + it[2].toString().replaceAll(~/.+sample/,"").replaceAll(~/.fastq/,""), it[2] )})
 
-params.filtered_fastq = workflow.launchDir + '/donut_falls/rename'
-Channel
-  .fromPath("params.filtered_fastq\*fastq", type:'file')
-  .ifEmpty {
-    println("Could not find fastq files. Set with 'params.fastq_pass_directory'")
-    exit 1
-  }
-//  .map()
-  .view()
-  .set{filtered_fastq}
+    flye_assembly.out.assembly
+        .mix(miniasm_assembly.out.assembly)
+        .mix(raven_assembly.out.assembly)
+        .mix(unicycler_assembly.out.assembly)
+        .map { it -> tuple( it[0].replaceAll(~/_flye.+/,"").replaceAll(~/_miniasm.+/,"").replaceAll(~/_raven.+/,"").replaceAll(~/_unicycler.+/,""), it[1])}
+        .groupTuple()
+        .join(ch_fastq, by:0)
+        .set { ch_assemblies }
 
-params.trycycler_dotplot_options = ''
-process trycycler_dotplot {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-  //  container 'staphb/trycycler:latest'
+    cluster(ch_assemblies)
+    //dotplot(cluster.out.cluster.transpose())
+    reconcile(cluster.out.cluster.join(ch_fastq, by: 0).transpose().combine(ch_remove))
+    msa(reconcile.out.cluster)
+    partition(msa.out.cluster.groupTuple().join(ch_fastq, by: 0).transpose())
+    consensus(partition.out.cluster)
+    combine(consensus.out.fasta.groupTuple())
 
-  input:
-  tuple val(sample), path(cluster), from clustered_assemblies_dotplot
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into dotplots
-  file("logs/${task.process}/*.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    trycycler --version >> $log_file
-
-    trycycler dotplot !{params.trycycler_dotplot_options} \
-      --cluster_dir !{cluster} \
-      2>> $err_file >> $log_file
-
-    exit 1
-  '''
-}
-
-clustered_assemblies
-  .join(filtered_fastq, by: 0)
-  .join(dotplots, by:0)
-  .view()
-  .set{assemblies_and_fastq}
-
-process trycycler_reconcile {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-//  container 'staphb/trycycler:latest'
-
-  input:
-  tuple val(sample), path(cluster), file(fastq), file(dotplots) from fastq_pass_directory
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into reconciled_fastas
-  file("logs/${task.process}/*.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    trycycler --version >> $log_file
-
-    trycycler reconcile \
-      --reads !{fastq} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    exit 1
-  '''
-}
-
-params.trycycler_msa_options = ''
-process trycycler_msa {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-//  container 'staphb/trycycler:latest'
-
-  input:
-  tuple val(sample), file(fasta) from reconciled_fastas
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into msa
-  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    trycycler --version >> $log_file
-
-    trycycler msa !{params.trycycler_msa_options} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-      exit 1
-  '''
-}
-
-params.trycycler_partition_options = ''
-process trycycler_partition {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-//  container 'staphb/trycycler:latest'
-
-  input:
-  tuple val(sample), file(fasta), file(fastq) from reconciled_fastas
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into msa
-  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    trycycler --version >> $log_file
-
-    trycycler partition !{trycycler_partition_options} \
-      --reads !{fastq} \
-      --cluster_dirs !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    exit 1
-  '''
-}
-
-
-params.trycycler_consensus_options = ''
-process trycycler_consensus {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-//  container 'staphb/trycycler:latest'
-
-  input:
-  tuple val(sample), file(fasta), file(fastq) from reconciled_fastas
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into msa
-  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    trycycler --version >> $log_file
-
-    trycycler consensus !{params.trycycler_consensus_options} \
-      --cluster_dir !{cluster} \
-      --threads !{task.cpus} \
-      2>> $err_file >> $log_file
-
-    exit 1
-  '''
-}
-
-params.medaka_options = ''
-process medaka {
-  publishDir "${params.outdir}", mode: 'copy'
-  tag "${sample}"
-  echo true
-  cpus 1
-//  container 'staphb/trycycler:latest'
-
-  input:
-  tuple val(sample), file(fasta), file(fastq) from reconciled_fastas
-
-  output:
-  tuple env(sample), file("${task.process}/*.fastq.gz") into medaka_fastas
-  file("logs/${task.process}/${sample}.${workflow.sessionId}.{log,err}")
-
-  shell:
-  '''
-    mkdir -p !{task.process} logs/!{task.process}
-    log_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/!{task.process}/!{sample}.!{workflow.sessionId}.err
-
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    medaka --version >> $log_file
-
-    exit 1
-  '''
-}
-
-
-workflow.onComplete {
-    println("Pipeline completed at: $workflow.complete")
-    println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
+    emit:
+    fasta = combine.out.fasta    
 }

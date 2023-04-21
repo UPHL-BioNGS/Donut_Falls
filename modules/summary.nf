@@ -1,6 +1,8 @@
 process summary {
   tag "${sample}"
   cpus 1
+  publishDir "${params.outdir}", mode: 'copy'
+  container 'staphb/gfastats:1.3.6'
 
   input:
   tuple val(sample),

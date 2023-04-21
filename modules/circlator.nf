@@ -1,30 +1,40 @@
 process circlator {
+  publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
+  //stageInMode 'copy'
+  container 'staphb/circlator:1.5.5'
+  //errorStrategy 'ignore'
 
   input:
   tuple val(sample), file(fasta)
 
   output:
-  tuple val(sample), file("circlator/${sample}/${sample}.fasta"),   emit: fasta
-  path("circlator/${sample}/*"),                                    emit: directory
-  path("logs/circlator/${sample}.${workflow.sessionId}.{log,err}"), emit: logs
+  tuple val(sample), file("circlator/${sample}_unpolished.fasta"), emit: fasta
+  path "circlator/${sample}*",                                     emit: directory
+  path "circlator/${sample}_fixstart_summary.csv",                 emit: summary
 
   shell:
   '''
-    mkdir -p circlator/!{sample} logs/circlator
-    log_file=logs/circlator/!{sample}.!{workflow.sessionId}.log
-    err_file=logs/circlator/!{sample}.!{workflow.sessionId}.err
+    mkdir -p circlator
 
-    # time stamp + capturing tool versions
-    date | tee -a $log_file $err_file > /dev/null
-    circlator --version 2>> $err_file >> $log_file
+    circlator version
 
-    circlator fixstart  
-        !{fasta} \
-        circlator/!{sample} \
-        2>> $err_file >> $log_file
+    nucmer --version
 
-    exit 1
+    touch test_circular.fasta
+    cat *circular.fasta > circular.fa
+
+    circlator fixstart !{params.circlator_options} \
+        circular.fa \
+        circlator/!{sample}_fixstart
+
+    cp circlator/!{sample}_fixstart.fasta circlator/!{sample}_unpolished.fasta
+
+    touch test_open.fasta
+    cat *open.fasta >> circlator/!{sample}_unpolished.fasta
+
+    head -n 1 circlator/!{sample}_fixstart.log | tr "\\t" "," | awk '{print "sample," $0 }' > circlator/!{sample}_fixstart_summary.csv
+    tail -n+2 circlator/!{sample}_fixstart.log | tr "\\t" "," | awk -v sample=!{sample} '{print sample "," $0 }' >> circlator/!{sample}_fixstart_summary.csv
   '''
 }
