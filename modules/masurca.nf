@@ -12,6 +12,7 @@ process masurca {
   output:
   path "masurca/${sample}"
   tuple val(sample), file("masruca/${sample}.fasta"), emit: fasta
+  tuple val(sample), file("masruca/${sample}.gfa"), emit: gfa
 
   shell:
   '''
