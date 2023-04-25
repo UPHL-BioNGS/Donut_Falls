@@ -12,9 +12,15 @@ workflow metrics {
     main:
     nanoplot(ch_reads)
     busco(ch_consensus)
-    multiqc(ch_summary.mix(busco.out.summary).collect())
 
-    nanoplot.out.summary.collectFile(name: "NanoStats.csv",
-        keepHeader: true,
-        storeDir: "${params.outdir}/nanoplot")
+    nanoplot.out.summary
+        .collectFile(name: "NanoStats.csv",
+            keepHeader: true,
+            storeDir: "${params.outdir}/nanoplot")
+        .set { nanostats_summary }
+
+
+    multiqc(ch_summary.mix(busco.out.summary).mix(nanostats_summary).collect())
+
+
 }

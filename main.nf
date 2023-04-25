@@ -25,6 +25,7 @@ params.remove                      = 'remove.txt'
 params.reads                       = ''
 params.test_wf                     = false
 
+params.bandage_options             = ''
 params.busco_options               = ''
 params.circlator_options           = ''
 params.dragonflye_options          = ''
@@ -120,16 +121,17 @@ workflow {
     }
     
     filter(ch_input_files)
+    assembly(filter.out.fastq)
+
     ch_fastq     = ch_fasta.mix(filter.out.fastq)
     ch_illumina  = ch_illumina.mix(filter.out.reads)
-
-    assembly(filter.out.fastq)
     ch_fasta     = ch_fasta.mix(assembly.out.fasta)
-    ch_summary   = ch_summary.mix(filter.out.summary)
+    ch_summary   = ch_summary.mix(filter.out.summary).mix(assembly.out.summary)
 
   } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
     hybrid(ch_input_files.filter{it -> it[2]})
     ch_consensus = ch_consensus.mix(hybrid.out.fasta)
+    ch_summary   = ch_summary.mix(hybrid.out.summary)
 
   } else if ( params.assembler == 'trycycler' ) {
     if ( params.test_wf ) {
@@ -144,6 +146,7 @@ workflow {
 
     trycycler(filter.out.fastq, ch_remove.ifEmpty([]))
     ch_fasta    = ch_fasta.mix(trycycler.out.fasta)
+    ch_summary  = ch_summary.mix(trycycler.out.summary)
   }
 
   nanoplot(ch_sequencing_summary)
