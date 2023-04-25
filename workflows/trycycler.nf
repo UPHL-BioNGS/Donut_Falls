@@ -48,5 +48,6 @@ workflow trycycler {
     combine(consensus.out.fasta.groupTuple())
 
     emit:
-    fasta = combine.out.fasta    
+    fasta   = combine.out.fasta
+    summary = flye_assembly.out.summary.mix(raven_assembly.out.summary).mix(unicycler_assembly.out.summary).mix(miniasm_assembly.out.summary)
 }
