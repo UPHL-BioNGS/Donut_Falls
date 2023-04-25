@@ -10,7 +10,7 @@ process dragonflye {
   output:
   tuple val(sample), file("dragonflye/${sample}/${sample}_dragonflye.fasta"), optional: true,  emit: fasta
   tuple val(sample), file("dragonflye/${sample}/${sample}_dragonflye.gfa"),   optional: true,  emit: gfa
-  path "dragonflye/${sample}/${sample}_assembly_info.csv",                                     emit: summary
+  path "dragonflye/${sample}/${sample}_assembly_info.tsv",                                     emit: summary
   path "dragonflye/${sample}/*"                                                     
 
   shell:
@@ -30,7 +30,7 @@ process dragonflye {
     if [ -f "dragonflye/!{sample}/flye.fasta" ] ; then cp dragonflye/!{sample}/flye.fasta dragonflye/!{sample}/!{sample}_dragonflye.fasta ; fi
  
     # getting a summary file
-    head -n 1 dragonflye/!{sample}/flye-info.txt | tr "\\t" "," | awk '{print "sample," $0}' > dragonflye/!{sample}/!{sample}_assembly_info.csv
-    tail -n+2 dragonflye/!{sample}/flye-info.txt | tr "\\t" "," | awk -v sample=!{sample} '{print sample "," $0}' >> dragonflye/!{sample}/!{sample}_assembly_info.csv
+    head -n 1 dragonflye/!{sample}/flye-info.txt | awk '{print "sample\\t" $0}' > dragonflye/!{sample}/!{sample}_assembly_info.tsv
+    tail -n+2 dragonflye/!{sample}/flye-info.txt | awk -v sample=!{sample} '{print sample "\\t" $0}' >> dragonflye/!{sample}/!{sample}_assembly_info.tsv
   '''
 }

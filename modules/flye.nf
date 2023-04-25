@@ -11,7 +11,7 @@ process flye {
   output:
   tuple val(sample), file("flye/${sample}/${sample}_flye.fasta"), optional: true,  emit: fasta
   tuple val(sample), file("flye/${sample}/${sample}_flye.gfa"),   optional: true,  emit: gfa
-  path "flye/${sample}/${sample}_assembly_info.csv",                               emit: summary
+  path "flye/${sample}/${sample}_assembly_info.tsv",                               emit: summary
   path "flye/${sample}/*"                                                     
 
   shell:
@@ -30,7 +30,7 @@ process flye {
     if [ -f "flye/!{sample}/assembly_graph.gfa" ] ; then cp flye/!{sample}/assembly_graph.gfa flye/!{sample}/!{sample}_flye.gfa   ; fi
 
     # getting a summary file
-    head -n 1 flye/!{sample}/assembly_info.txt | tr "\\t" "," | awk '{print "sample," $0}' > flye/!{sample}/!{sample}_assembly_info.csv
-    tail -n+2 flye/!{sample}/assembly_info.txt | tr "\\t" "," | awk -v sample=!{sample} '{print sample "," $0}' >> flye/!{sample}/!{sample}_assembly_info.csv
+    head -n 1 flye/!{sample}/assembly_info.txt | awk '{print "sample\\t" $0}' > flye/!{sample}/!{sample}_assembly_info.tsv
+    tail -n+2 flye/!{sample}/assembly_info.txt | awk -v sample=!{sample} '{print sample "\\t" $0}' >> flye/!{sample}/!{sample}_assembly_info.tsv
   '''
 }
