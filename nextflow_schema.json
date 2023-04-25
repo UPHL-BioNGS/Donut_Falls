@@ -12,6 +12,11 @@
             "default" : "flye",
             "hidden": true
         },
+        "bandage_options":{
+            "type": "string",
+            "description": "options for process",
+            "hidden": true
+        },
         "busco_options": {
             "type": "string",
             "description": "options for process",
