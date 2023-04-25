@@ -27,6 +27,11 @@
             "description" : "Specifies if a config file is copied for the end user. Ends script.",
             "hidden" : true
         },
+        "dragonflye_options": {
+            "type": "string",
+            "description": "options for process",
+            "hidden": true
+        },
         "enable_porechop": {
             "type": "boolean",
             "description": "Allows porechop before filtlong",

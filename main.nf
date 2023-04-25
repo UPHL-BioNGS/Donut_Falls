@@ -27,6 +27,7 @@ params.test_wf                     = false
 
 params.busco_options               = ''
 params.circlator_options           = ''
+params.dragonflye_options          = ''
 params.enable_porechop             = false
 params.fastp_options               = ''
 params.filtlong_options            = '--min_length 1000 --keep_percent 95'
@@ -112,7 +113,7 @@ workflow {
 
 
 
-  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' ) {
+  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' || params.assembler == 'dragonflye' ) {
     if ( params.test_wf ) {
       test()
       ch_input_files = ch_input_files.mix(test.out.fastq)

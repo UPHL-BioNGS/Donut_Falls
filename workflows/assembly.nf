@@ -1,10 +1,11 @@
-include { circlator }                   from '../modules/circlator' addParams(params)
-include { flye }                        from '../modules/flye'      addParams(params)
-include { gfastats }                    from '../modules/gfastats'  addParams(params)
-include { medaka }                      from '../modules/medaka'    addParams(params)
-include { miniasm }                     from '../modules/miniasm'   addParams(params)
-include { raven }                       from '../modules/raven'     addParams(params)
-include { unicycler_long as unicycler } from '../modules/unicycler' addParams(params)
+include { circlator }                   from '../modules/circlator'     addParams(params)
+include { dragonflye }                  from '../modules/dragonflye'    addParams(params)
+include { flye }                        from '../modules/flye'          addParams(params)
+include { gfastats }                    from '../modules/gfastats'      addParams(params)
+include { medaka }                      from '../modules/medaka'        addParams(params)
+include { miniasm }                     from '../modules/miniasm'       addParams(params)
+include { raven }                       from '../modules/raven'         addParams(params)
+include { unicycler_long as unicycler } from '../modules/unicycler'     addParams(params)
 
 workflow assembly {
     take:
@@ -35,6 +36,18 @@ workflow assembly {
     } else if (params.assembler == 'lr_unicycler' ) {
         unicycler(ch_fastq)
         ch_fasta = unicycler.out.fasta
+    } else if (params.assembler == 'dragonflye' ) {
+        dragonflye(ch_fastq)
+        ch_gfa = dragonflye.out.gfa
+
+        dragonflye.out.summary
+            .collectFile(
+                storeDir: "${params.outdir}/dragonflye/",
+                keepHeader: true,
+                sort: { file -> file.text },
+                name: "dragonflye_summary.csv")
+            .set { dragonflye_summary }
+
     }
 
     gfastats(ch_gfa)
