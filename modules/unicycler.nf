@@ -3,7 +3,7 @@ process unicycler {
   cpus 12
   publishDir "${params.outdir}", mode: 'copy'
   container 'staphb/unicycler:0.5.0'
-  errorStrategy 'ignore'
+  //errorStrategy 'ignore'
 
   when:
   illumina != null
@@ -14,6 +14,7 @@ process unicycler {
   output:
   path "unicycler/${sample}",                                     emit: directory
   tuple val(sample), file("unicycler/${sample}/${sample}.fasta"), emit: fasta
+  tuple val(sample), file("unicycler/${sample}/${sample}.gfa"),   emit: gfa
 
   shell:
   '''
@@ -28,7 +29,8 @@ process unicycler {
       -o unicycler/!{sample} \
       -t !{task.cpus} 
 
-    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta ; fi 
+    if [ -f "unicycler/!{sample}/assembly.fasta" ] ; then cp unicycler/!{sample}/assembly.fasta unicycler/!{sample}/!{sample}.fasta ; fi
+    if [ -f "unicycler/!{sample}/assembly.gfa" ] ; then cp unicycler/!{sample}/assembly.gfa unicycler/!{sample}/!{sample}.gfa ; fi
     '''
 }
 
@@ -43,7 +45,7 @@ process unicycler_long {
   tuple val(sample), file(nanopore)
 
   output:
-  path "unicycler/${sample}",                                    emit: directory
+  path "unicycler/${sample}",                                     emit: directory
   tuple val(sample), file("unicycler/${sample}/${sample}.fasta"), emit: fasta
   tuple val(sample), file("unicycler/${sample}/${sample}.gfa"),   emit: gfa
 
