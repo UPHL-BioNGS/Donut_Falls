@@ -23,8 +23,8 @@ process multiqc {
     multiqc --version
 
     if [ -f "circlator_summary.csv" ]   ; then mv circlator_summary.csv circlator_summary_mqc.csv    ; fi
-    if [ -f "flye_summary.tsv" ]        ; then mv flye_summary.csv flye_summary_mqc.tsv              ; fi
-    if [ -f "dragonflye_summary.tsv" ]  ; then mv dragonflye_summary.csv dragonflye_summary_mqc.tsv  ; fi
+    if [ -f "flye_summary.tsv" ]        ; then mv flye_summary.tsv flye_summary_mqc.tsv              ; fi
+    if [ -f "dragonflye_summary.tsv" ]  ; then mv dragonflye_summary.tsv dragonflye_summary_mqc.tsv  ; fi
     if [ -f "gfastats_summary.csv" ]    ; then mv gfastats_summary.csv gfastats_summary_mqc.csv      ; fi
     if [ -f "NanoStats.csv" ]           ; then mv NanoStats.csv NanoStats_mqc.csv                    ; fi
 
