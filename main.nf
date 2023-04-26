@@ -56,6 +56,7 @@ params.trycycler_reconcile_options = ''
 params.unicycler_options           = ''
 
 include { assembly }                     from './workflows/assembly'  addParams(params)
+include { copy }                         from './modules/copy'        addParams(params)
 include { filter }                       from './workflows/filter'    addParams(params)
 include { hybrid }                       from './workflows/hybrid'    addParams(params)
 include { nanoplot_summary as nanoplot } from './modules/nanoplot'    addParams(params)
@@ -157,4 +158,14 @@ workflow {
     ch_input_files.map{it -> tuple (it[0], it[1])},
     ch_consensus,
     ch_summary.ifEmpty([]))
+
+  copy(ch_consensus.map{it -> tuple(it[1])}.collect())
+}
+
+workflow.onComplete {
+  println("Pipeline completed at: $workflow.complete")
+  println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
+  println("The consensus fasta files can be found in ${params.outdir}/consensus")
+  println("The fasta files are from each phase of assembly. polca > polypolish > medaka > unpolished")
+  println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }
