@@ -17,11 +17,13 @@ process medaka {
     
     medaka --version
 
+    cat !{fasta} | sed 's/ /_/g' > !{fasta}.fasta
+
     medaka_consensus !{params.medaka_options} \
       -i !{fastq} \
-      -d !{fasta} \
+      -d !{fasta}.fasta \
       -o medaka/!{sample} \
-      -t 2
+      -t !{task.cpus}
 
     cp medaka/!{sample}/consensus.fasta medaka/!{sample}/!{sample}_medaka_consensus.fasta
   '''
