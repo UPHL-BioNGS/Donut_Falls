@@ -1,5 +1,4 @@
 process filtlong {
-  publishDir "${params.outdir}", mode: 'copy'
   tag "${sample}"
   cpus 1
   container 'staphb/filtlong:0.2.1'
