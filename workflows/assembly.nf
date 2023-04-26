@@ -13,9 +13,8 @@ workflow assembly {
     ch_fastq
 
     main:
-    ch_gfa      = Channel.empty()
-    ch_fasta    = Channel.empty()
-    ch_summary = Channel.empty()
+    ch_gfa       = Channel.empty()
+    ch_summary   = Channel.empty()
 
     if (params.assembler == 'raven' ) {
         raven(ch_fastq)
@@ -38,10 +37,7 @@ workflow assembly {
         ch_gfa = ch_gfa.mix(miniasm.out.gfa)
     } else if (params.assembler == 'lr_unicycler' ) {
         unicycler(ch_fastq)
-        bandage(unicycler.out.gfa)
-
-        ch_fasta = unicycler.out.fasta
-        ch_summary = ch_summary.mix(bandage.out.summary)
+        ch_gfa = ch_gfa.mix(unicycler.out.gfa)
     } else if (params.assembler == 'dragonflye' ) {
         dragonflye(ch_fastq)
         ch_gfa = dragonflye.out.gfa
@@ -78,7 +74,7 @@ workflow assembly {
         .set { circlator_summary }
 
     emit:
-    fasta       = circlator.out.fasta.mix(ch_fasta)
-    assembly    = gfastats.out.assembly.mix(ch_fasta)
+    fasta       = circlator.out.fasta
+    assembly    = gfastats.out.assembly
     summary     = ch_summary.mix(bandage.out.summary).mix(gfastats_summary).mix(circlator_summary)
 }
