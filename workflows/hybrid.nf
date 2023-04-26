@@ -12,11 +12,10 @@ workflow hybrid {
 
     if (params.assembler == "unicycler" ) {
         unicycler(ch_input)
-        ch_gfa = ch_gfa.mix(unicycler.out.gfa)
+        ch_gfa       = ch_gfa.mix(unicycler.out.gfa)
         ch_consensus = ch_consensus.mix(unicycler.out.fasta)
     } else if (params.assembler == "masurca") {
         masurca(ch_input)
-        ch_gfa = ch_gfa.mix(masurca.out.gfa)
         ch_consensus = ch_consensus.mix(masurca.out.fasta)
     }    
  
