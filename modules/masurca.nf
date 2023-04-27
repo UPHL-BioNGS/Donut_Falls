@@ -15,7 +15,7 @@ process masurca {
 
   shell:
   '''
-    mkdir masurca/!{sample}
+    mkdir -p masurca/!{sample}
 
     masurca --version
 
