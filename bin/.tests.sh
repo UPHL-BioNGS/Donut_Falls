@@ -65,3 +65,13 @@ nextflow run /home/eriny/sandbox/Donut_Falls \
     --sequencing_summary doesntexit \
     -with-tower \
     -resume
+
+
+echo "$(date): testing trycycler" && \
+nextflow run /home/eriny/sandbox/Donut_Falls \
+    -profile singularity \
+    --sample_sheet /home/eriny/sandbox/test_files/donut/sample_sheet.csv \
+    --outdir    trycycler \
+    --assembler trycycler \
+    -with-tower \
+    -resume
