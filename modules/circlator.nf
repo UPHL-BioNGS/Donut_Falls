@@ -32,7 +32,7 @@ process circlator {
     cp circlator/!{sample}_fixstart.fasta circlator/!{sample}_unpolished.fasta
 
     touch test_open.fasta
-    cat *open.fasta | fold -w 60 >> circlator/!{sample}_unpolished.fasta
+    cat *open.fasta >> circlator/!{sample}_unpolished.fasta
 
     head -n 1 circlator/!{sample}_fixstart.log | tr "\\t" "," | awk '{print "sample," $0 }' > circlator/!{sample}_fixstart_summary.csv
     tail -n+2 circlator/!{sample}_fixstart.log | tr "\\t" "," | awk -v sample=!{sample} '{print sample "," $0 }' >> circlator/!{sample}_fixstart_summary.csv
