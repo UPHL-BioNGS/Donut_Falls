@@ -15,7 +15,7 @@ process copy {
     
     for fasta in !{fasta}
     do
-        cat $fasta | sed 's/_length/ /g' | sed 's/_circular/ /g' > consensus/$fasta
+        cat $fasta | sed 's/_length/ length/g' | sed 's/_circular/ circular/g' | sed 's/_polypolish//g' > consensus/$fasta
     done
   '''
 }
