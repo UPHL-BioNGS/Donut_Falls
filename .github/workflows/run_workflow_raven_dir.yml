@@ -24,11 +24,14 @@ jobs:
         run: |
           docker --version
 
-          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
-
           mkdir reads
-          mv long_reads_high_depth.fastq.gz reads/.
+          
+          wget -q https://github.com/nf-core/test-datasets/blob/23f5b889e4736798c8692e9b92810d9a3e37ee97/nanopore/subset15000.fq.gz?raw=true -O reads/nfcore_subset15000.fa.gz
 
+          wget -q https://bridges.monash.edu/ndownloader/files/23754659 -O great_dataset.tar.gz
+          tar -xvf great_dataset.tar.gz
+          mv reads.fastq.gz reads/.
+          
           nextflow run . -profile docker -c .github/workflows/github_actions.config --reads reads --assembler raven
 
           tree donut_falls
