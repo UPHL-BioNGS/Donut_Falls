@@ -69,7 +69,6 @@ There are currently several options for assembly
 - [raven](https://github.com/lbcb-sci/raven)
 - [unicycler](https://github.com/rrwick/Unicycler) (requires short reads for hybrid assembly)
 - [lr_unicycler](https://github.com/rrwick/Unicycler) (uses unicycler's nanopore-only option)
-- [masurca](https://github.com/alekseyzimin/masurca) (requires short reads for hybrid assembly)
 - [trycycler](https://github.com/rrwick/Trycycler) - please read [the wiki page](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Trycycler)
 
 These are specified with the `assembler` paramater.
@@ -79,9 +78,8 @@ These are specified with the `assembler` paramater.
 # assembler is flye, miniasm, raven, or lr_unicycler
 nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet <sample_sheet.csv> --assembler < assembler >
 
-# hybrid assembly where both nanopore and illumina files are required
-# assembler is either unicycler or masurca
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet <sample_sheet.csv> --assembler < assembler >
+# hybrid assembly with unicycler where both nanopore and illumina files are required
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet <sample_sheet.csv> --assembler unicycler
 ```
 
 ### Reading the sequencing summary file
