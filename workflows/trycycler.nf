@@ -47,6 +47,32 @@ workflow trycycler {
     consensus(partition.out.cluster)
     combine(consensus.out.fasta.groupTuple())
 
+    flye_assembly.out.summary
+        .mix(raven_assembly.out.summary)
+        .mix(unicycler_assembly.out.summary)
+        .mix(miniasm_assembly.out.summary)
+        .branch { it ->
+            gfastats:  it =~ /gfastats/
+            circlator: it =~ /circlator/
+            other: true
+        }
+        .set { ch_for_summary }
+
+    // ch_for_summary.gfastats
+    //     .collectFile(
+    //         storeDir: "${params.outdir}/gfastats/",
+    //         keepHeader: true,
+    //         name: "gfastats_summary.csv")
+    //     .set { gfastats_summary }
+
+    // ch_for_summary.circlator
+    //     .collectFile(
+    //         storeDir: "${params.outdir}/circlator/",
+    //         keepHeader: true,
+    //         name: "circlator_summary.csv")
+    //     .set { circlator_summary }
+
     emit:
-    fasta = combine.out.fasta    
+    fasta   = combine.out.fasta
+    summary = ch_for_summary.other
 }

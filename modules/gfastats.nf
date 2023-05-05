@@ -39,7 +39,7 @@ process gfastats {
         grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}_${header}_circular.fasta
       else
         echo ">$header length=$length circular=false" > gfastats/!{sample}_${header}_open.fasta
-        grep -w "^S" !{gfa} | grep -w $header | awk '{print $3}' >> gfastats/!{sample}_${header}_open.fasta
+        grep -w "^S" !{gfa} | awk -v header=$header '{if ($2 == header) print $0}' | awk '{print $3}' >> gfastats/!{sample}_${header}_open.fasta
       fi
     fi
     echo ">!{sample}_${header} length=$length circular=$circ" >> gfastats/!{sample}.fasta

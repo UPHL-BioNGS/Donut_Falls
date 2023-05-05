@@ -25,8 +25,10 @@ params.remove                      = 'remove.txt'
 params.reads                       = ''
 params.test_wf                     = false
 
+params.bandage_options             = ''
 params.busco_options               = ''
 params.circlator_options           = ''
+params.dragonflye_options          = ''
 params.enable_porechop             = false
 params.fastp_options               = ''
 params.filtlong_options            = '--min_length 1000 --keep_percent 95'
@@ -54,6 +56,7 @@ params.trycycler_reconcile_options = ''
 params.unicycler_options           = ''
 
 include { assembly }                     from './workflows/assembly'  addParams(params)
+include { copy }                         from './modules/copy'        addParams(params)
 include { filter }                       from './workflows/filter'    addParams(params)
 include { hybrid }                       from './workflows/hybrid'    addParams(params)
 include { nanoplot_summary as nanoplot } from './modules/nanoplot'    addParams(params)
@@ -112,23 +115,24 @@ workflow {
 
 
 
-  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' ) {
+  if ( params.assembler == 'flye' || params.assembler == 'raven' || params.assembler == 'miniasm' || params.assembler == 'lr_unicycler' || params.assembler == 'dragonflye' ) {
     if ( params.test_wf ) {
       test()
       ch_input_files = ch_input_files.mix(test.out.fastq)
     }
     
     filter(ch_input_files)
+    assembly(filter.out.fastq)
+
     ch_fastq     = ch_fasta.mix(filter.out.fastq)
     ch_illumina  = ch_illumina.mix(filter.out.reads)
-
-    assembly(filter.out.fastq)
     ch_fasta     = ch_fasta.mix(assembly.out.fasta)
-    ch_summary   = ch_summary.mix(filter.out.summary)
+    ch_summary   = ch_summary.mix(filter.out.summary).mix(assembly.out.summary)
 
   } else if ( params.assembler == 'unicycler' || params.assembler == 'masurca' ) {
     hybrid(ch_input_files.filter{it -> it[2]})
     ch_consensus = ch_consensus.mix(hybrid.out.fasta)
+    ch_summary   = ch_summary.mix(hybrid.out.summary)
 
   } else if ( params.assembler == 'trycycler' ) {
     if ( params.test_wf ) {
@@ -143,6 +147,7 @@ workflow {
 
     trycycler(filter.out.fastq, ch_remove.ifEmpty([]))
     ch_fasta    = ch_fasta.mix(trycycler.out.fasta)
+    ch_summary  = ch_summary.mix(trycycler.out.summary)
   }
 
   nanoplot(ch_sequencing_summary)
@@ -153,4 +158,14 @@ workflow {
     ch_input_files.map{it -> tuple (it[0], it[1])},
     ch_consensus,
     ch_summary.ifEmpty([]))
+
+  copy(ch_consensus.map{it -> tuple(it[1])}.collect())
+}
+
+workflow.onComplete {
+  println("Pipeline completed at: $workflow.complete")
+  println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
+  println("The consensus fasta files can be found in ${params.outdir}/consensus")
+  println("The fasta files are from each phase of assembly. polca > polypolish > medaka > unpolished")
+  println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }

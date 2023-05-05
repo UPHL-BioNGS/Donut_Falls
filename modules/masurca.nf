@@ -11,25 +11,25 @@ process masurca {
 
   output:
   path "masurca/${sample}"
-  tuple val(sample), file("masruca/${sample}.fasta"), emit: fasta
+  tuple val(sample), file("masurca/${sample}/${sample}_primary.genome.scf.fasta"), emit: fasta
 
   shell:
   '''
-  masurca --version
+    mkdir -p masurca/!{sample}
 
-# The same error with 4.0.4 with Illumina and nanopore data
-# Upd package numactl must be installed.
-# see https://github.com/alekseyzimin/masurca/issues/239
+    masurca --version
 
-  gunzip !{fastq[0]}
-  gunzip !{fastq[1]}
+    masurca !{params.masurca_options} \
+      -t !{task.cpus} \
+      -i !{fastq[0]},!{fastq[1]} \
+      -r !{nanopore}
 
-  masurca !{params.masurca_options} \
-    -t !{task.cpus} \
-    -i $(echo !{fastq[0]} | sed 's/.gz$//g'),$(echo !{fastq[1]}  | sed 's/.gz$//g') \
-    -r !{nanopore}
+    for dir in ls -d CA*
+    do
+      mv $dir masurca/!{sample}/.
+    done
 
-  exit 1
+    cp $(ls masurca/!{sample}/CA*/primary.genome.scf.fasta) masurca/!{sample}/!{sample}_primary.genome.scf.fasta 
   '''
 }
 

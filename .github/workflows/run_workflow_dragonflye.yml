@@ -1,4 +1,4 @@
-name: Test Donut Falls raven assembly with polishing
+name: Test Donut Falls dragonflye assembly
 
 on: [pull_request, workflow_dispatch]
 
@@ -24,8 +24,10 @@ jobs:
         run: |
           docker --version
           
-          # This needs a better dataset. Sorry!
+          wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR377/009/ERR3772599/ERR3772599_1.fastq.gz
 
-          # nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/github_actions_hd_hybrid_sample_sheet.txt --assembler raven
+          mv ERR3772599_1.fastq.gz reads/.
+          
+          nextflow run . -profile docker -c .github/workflows/github_actions.config --reads reads --assembler dragonflye
 
-          # tree donut_falls
+          tree donut_falls
