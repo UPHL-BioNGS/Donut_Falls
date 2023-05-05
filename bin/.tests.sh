@@ -73,5 +73,6 @@ nextflow run /home/eriny/sandbox/Donut_Falls \
     --sample_sheet /home/eriny/sandbox/test_files/donut/sample_sheet.csv \
     --outdir    trycycler \
     --assembler trycycler \
+    --trycycler_min_fasta 12 \
     -with-tower \
     -resume
