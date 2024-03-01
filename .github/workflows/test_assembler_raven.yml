@@ -1,4 +1,4 @@
-name: Test Donut Falls unicycler long read only assembly
+name: Test Donut Falls raven assembly
 
 on: [pull_request, workflow_dispatch]
 
@@ -8,12 +8,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          lfs: true
-
-      - name: Checkout LFS objects
-        run: git lfs checkout
+        uses: actions/checkout@v4
             
       - name: Install Nextflow
         run: |
@@ -23,7 +18,12 @@ jobs:
       - name: Run Donut Falls
         run: |
           docker --version
-
-          nextflow run . -profile docker,test4 -c .github/workflows/github_actions.config
-          tree donut_falls
           
+          nextflow run . -profile docker,test -c .github/workflows/github_actions.config --assembler raven
+
+          tree donut_falls
+
+      - name: Check files
+        run: |
+          ls  donut_falls/multiqc/multiqc_report.html
+          cat donut_falls/summary/donut_falls_summary.json
