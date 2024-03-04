@@ -1186,8 +1186,8 @@ process nanoplot {
 
   output:
   path "nanoplot/*", emit: everything
-  path "nanoplot/*_NanoStats.txt", emit: stats
-  path "nanoplot/*_NanoStats.csv", emit: summary
+  path "nanoplot/${meta.id}_NanoStats.txt", emit: stats
+  path "nanoplot/${meta.id}_NanoStats.csv", emit: summary
   path "versions.yml", emit: versions
 
   when:
@@ -1396,7 +1396,7 @@ process raven {
 }
 
 process summary {
-  tag           "${meta.id}"
+  tag           "Creating summary"
   label         "process_single"
   publishDir    "${params.outdir}/summary", mode: 'copy'
   container     'staphb/multiqc:1.19'
@@ -1412,9 +1412,6 @@ process summary {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
-  def args   = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${meta.id}"
   """
   #!/usr/bin/env python3
 
@@ -1736,7 +1733,6 @@ process test_donut_falls {
 
   output:
   tuple val("df"), file("test_files/test.fastq.gz"), file("test_files/test_{1,2}.fastq.gz"), emit: fastq
-  tuple val("dflr"), file("test_files/test.fastq.gz"), emit: lrfastq
 
   when:
   task.ext.when == null || task.ext.when
@@ -1745,6 +1741,29 @@ process test_donut_falls {
   """
   wget --quiet https://zenodo.org/records/10733190/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
   tar -xvf dataset.tar.gz
+  """
+}
+
+process test_donut_falls_lr {
+  tag           "Downloading R10.4 reads"
+  label         "process_single"
+  publishDir    "${params.outdir}/test_files/df", mode: 'copy'
+  container     'staphb/multiqc:1.19'
+  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  time          '1h'
+
+  output:
+  tuple val("dflr"), file("test_files/test_lr.fastq.gz"), emit: fastq
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  shell:
+  """
+  wget --quiet https://zenodo.org/records/10733190/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+  tar -xvf dataset.tar.gz
+
+  mv test_files/test.fastq.gz test_files/test_lr.fastq.gz
   """
 }
 
@@ -1972,9 +1991,9 @@ workflow DONUT_FALLS {
     versions(ch_collated_versions)
     ch_summary = ch_summary.mix(versions.out.versions)
 
-    summary(ch_summary.collect())
+    summary(ch_summary.unique().collect())
 
-    multiqc(ch_summary.collect())
+    multiqc(ch_summary.unique().collect())
 
     ch_consensus
       .combine(circulocov_summary)
@@ -2010,6 +2029,8 @@ workflow {
 
     test_donut_falls()
 
+    test_donut_falls_lr()
+
     test_donut_falls.out.fastq
       .map { it ->
         meta = [id:it[0]] 
@@ -2019,7 +2040,7 @@ workflow {
       }
       .set{ ch_test_df_out }
 
-    test_donut_falls.out.lrfastq
+    test_donut_falls_lr.out.fastq
       .map { it ->
         meta = [id:it[0]] 
         tuple( meta,
