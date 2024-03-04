@@ -1,4 +1,4 @@
-name: Test Donut Falls flye assembly
+name: Test Donut Falls flye and raven assembly
 
 on: [pull_request, workflow_dispatch]
 
