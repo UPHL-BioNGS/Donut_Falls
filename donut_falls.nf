@@ -58,8 +58,7 @@ def paramCheck(keys) {
     "sequencing_summary",
     "assembler",
     "test",
-    "config_file",
-    "ontime"]
+    "config_file"]
 
   for(key in keys){
     if (key !in set_keys){
