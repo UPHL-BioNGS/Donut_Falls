@@ -1730,38 +1730,18 @@ process test_donut_falls {
   time          '1h'
 
   output:
-  tuple val("df"), file("test_files/test.fastq.gz"), file("test_files/test_{1,2}.fastq.gz"), emit: fastq
+  tuple val("df"), file("test_files/test_nanopore.fastq.gz"), file("test_files/test_illumina_{1,2}.fastq.gz"), emit: fastq
+  tuple val("df_lr"), file("test_files/test_nanopore_only.fastq.gz"), emit: lrfastq
 
   when:
   task.ext.when == null || task.ext.when
 
   shell:
   """
-  wget --quiet https://zenodo.org/records/10733190/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
-  tar -xvf dataset.tar.gz
-  """
-}
-
-process test_donut_falls_lr {
-  tag           "Downloading R10.4 reads"
-  label         "process_single"
-  publishDir    "${params.outdir}/test_files/df", mode: 'copy'
-  container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
-  time          '1h'
-
-  output:
-  tuple val("dflr"), file("test_files/test_lr.fastq.gz"), emit: fastq
-
-  when:
-  task.ext.when == null || task.ext.when
-
-  shell:
-  """
-  wget --quiet https://zenodo.org/records/10733190/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+  wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
   tar -xvf dataset.tar.gz
 
-  mv test_files/test.fastq.gz test_files/test_lr.fastq.gz
+  cp test_files/test_nanopore.fastq.gz test_files/test_nanopore_only.fastq.gz
   """
 }
 
@@ -2026,8 +2006,6 @@ workflow {
 
     test_donut_falls()
 
-    test_donut_falls_lr()
-
     test_donut_falls.out.fastq
       .map { it ->
         meta = [id:it[0]] 
@@ -2037,7 +2015,7 @@ workflow {
       }
       .set{ ch_test_df_out }
 
-    test_donut_falls_lr.out.fastq
+    test_donut_falls.out.lrfastq
       .map { it ->
         meta = [id:it[0]] 
         tuple( meta,
