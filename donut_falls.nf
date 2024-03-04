@@ -1118,12 +1118,16 @@ process multiqc {
     cat circulocov_summary.txt | awk '{print NR '\\t' \$0}' >> circulocov_mqc.txt
   fi
 
+  touch whatever.png
+
   pngs=\$(ls *png)
   for png in \${pngs[@]}
   do
     new_name=\$(echo \$png | sed 's/.png\$/_mqc.png/g')
     cp \$png \$new_name
   done
+
+  rm whatever_mqc.png
 
   multiqc ${args} \
     --outdir multiqc \
