@@ -1345,9 +1345,7 @@ process rasusa {
 
   rasusa ${args} \
     --input ${fastq} \
-    --output rasusa/${prefix}_rasusa.fastq
-
-  gzip --force rasusa/${prefix}_rasusa.fastq
+    --output rasusa/${prefix}_rasusa.fastq.gz
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -1962,13 +1960,12 @@ workflow DONUT_FALLS {
       }
       .set { ch_assemblies }
 
-    // TODO : test this
     ch_assemblies.dragonflye
       .join(ch_nanopore_input, by: 0 , remainder: false).join(ch_illumina_input, by: 0, remainder: true)
       .mix(ch_assemblies.flye.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_illumina_input, by: 0, remainder: true))
       .mix(ch_assemblies.unicycler.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_illumina_input, by: 0, remainder: true))
       .mix(ch_assemblies.raven.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_illumina_input, by: 0, remainder: true))
-      .filter{it[1]}
+      .filter{ it -> if (it) {it[1]}}
       .set{ch_assembly_reads}
 
     circulocov(ch_assembly_reads)
