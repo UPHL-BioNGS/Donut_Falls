@@ -133,7 +133,7 @@ ch_input_files
 //   label         "process_medium"
 //   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
 //   container     'staphb/ontime:0.2.3'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '45m'
 //
 //   input:
@@ -173,7 +173,7 @@ ch_input_files
 //   label         "process_high"
 //   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
 //   container     'staphb/dragonflye:1.1.2'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '10h'
 //
 //   input:
@@ -220,7 +220,7 @@ ch_input_files
 //   label         "process_high"
 //   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
 //   container     'quay.io/biocontainers/hybracter:0.6.0--pyhdfd78af_0'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '10h'
 //
 //   input:
@@ -257,7 +257,7 @@ ch_input_files
 //   label         "process_single"
 //   publishDir    "${params.outdir}/test_files/nfcore", mode: 'copy'
 //   container     'staphb/multiqc:1.19'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '1h'
 
 //   output:
@@ -277,7 +277,7 @@ ch_input_files
 //   label         "process_single"
 //   publishDir    "${params.outdir}/test_files/great", mode: 'copy'
 //   container     'staphb/multiqc:1.19'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '1h'
 
 //   output:
@@ -301,7 +301,7 @@ ch_input_files
 //   label         "process_single"
 //   publishDir    "${params.outdir}/test_files/good", mode: 'copy'
 //   container     'staphb/multiqc:1.19'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '1h'
 
 //   output:
@@ -322,7 +322,7 @@ ch_input_files
 //   label         "process_single"
 //   publishDir    "${params.outdir}/test_files/mediocre", mode: 'copy'
 //   container     'staphb/multiqc:1.19'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '1h'
 
 //   output:
@@ -345,7 +345,7 @@ ch_input_files
 //   label         "process_single"
 //   publishDir    "${params.outdir}/test_files/bad", mode: 'copy'
 //   container     'staphb/multiqc:1.19'
-//   //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 //   time          '1h'
 
 //   output:
@@ -402,7 +402,7 @@ process bandage {
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'quay.io/biocontainers/bandage:0.8.1--hc9558a2_2'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -437,7 +437,7 @@ process busco {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/busco:5.6.1-prok-bacteria_odb10_2024-01-08'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '45m'
 
   input:
@@ -473,7 +473,7 @@ process bwa {
   label         'process_high'
   // no publishDir because the sam files are too big
   container     'staphb/bwa:0.7.17'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '2h'
 
   input:
@@ -508,7 +508,7 @@ process circulocov {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'quay.io/uphl/circulocov:0.1.20240104-2024-02-21'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
 
   input:
@@ -553,7 +553,7 @@ process copy {
   label         "process_single"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -656,7 +656,7 @@ process dnaapler {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/dnaapler:0.7.0'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
 
   input:
@@ -693,7 +693,7 @@ process fastp {
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/fastp:0.23.4'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -756,7 +756,7 @@ process flye {
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/flye:2.9.3'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10h'
 
   input:
@@ -803,7 +803,7 @@ process gfastats {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: 'gfastats/*'
   container     'staphb/gfastats:1.3.6'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -847,7 +847,7 @@ process gfa_to_fasta {
   label         "process_low"
   // no publishDir
   container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -907,7 +907,7 @@ process medaka {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'ontresearch/medaka:v1.11.3'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '30m'
 
   input:
@@ -950,7 +950,7 @@ process multiqc {
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy'
   container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -1140,7 +1140,7 @@ process nanoplot_summary {
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy'
   container     'staphb/nanoplot:1.42.0'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -1178,7 +1178,7 @@ process nanoplot {
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/nanoplot:1.42.0'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -1222,7 +1222,7 @@ process polypolish {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/polypolish:0.6.0'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '45m'
 
   input:
@@ -1268,7 +1268,7 @@ process pypolca {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/pypolca:0.3.1'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '30m'
   
   input:
@@ -1324,7 +1324,7 @@ process rasusa {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/rasusa:0.8.0'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
 
   input:
@@ -1359,7 +1359,7 @@ process raven {
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/raven:1.8.3'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10h'
 
   input:
@@ -1398,7 +1398,7 @@ process summary {
   label         "process_single"
   publishDir    "${params.outdir}/summary", mode: 'copy'
   container     'staphb/multiqc:1.19'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10m'
   
   input:
@@ -1552,7 +1552,7 @@ process unicycler {
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy'
   container     'staphb/unicycler:0.5.0'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '10h'
 
   input:
@@ -1596,7 +1596,7 @@ process versions {
   publishDir    "${params.outdir}/summary", mode: 'copy'
   container     'staphb/multiqc:1.19'
   time          '10m'
-  ////errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
 
   input:
   file(input)
@@ -1704,7 +1704,7 @@ process test_unicycler {
   label         "process_single"
   publishDir    "${params.outdir}/test_files/unicycler", mode: 'copy'
   container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
 
   output:
@@ -1726,7 +1726,7 @@ process test_donut_falls {
   label         "process_single"
   publishDir    "${params.outdir}/test_files/df", mode: 'copy'
   container     'staphb/multiqc:1.19'
-  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
 
   output:
