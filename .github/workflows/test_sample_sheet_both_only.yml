@@ -17,9 +17,11 @@ jobs:
  
       - name: Get files
         run: |
-            wget --quiet https://zenodo.org/records/10733190/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
-            tar -xvf dataset.tar.gz
+          wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+          tar -xvf dataset.tar.gz
 
+          cp test_files/test_nanopore.fastq.gz test_files/test_nanopore_only.fastq.gz
+          
       - name: Run Donut Falls
         run: |
           docker --version

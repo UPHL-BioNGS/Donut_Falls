@@ -1,2 +1,2 @@
 sample,fastq,fastq_1,fastq_2
-test,test_files/test.fastq.gz,test_files/test_1.fastq.gz,test_files/test_2.fastq.gz
+test,test_files/test_nanopore.fastq.gz,test_files/test_illumina_1.fastq.gz,test_files/test_illumina_1.fastq.gz
