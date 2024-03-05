@@ -363,6 +363,28 @@ ch_input_files
 //   """
 // }
 
+// process test_unicycler {
+//   tag           "Downloading Unicycler test files"
+//   label         "process_single"
+//   publishDir    "${params.outdir}/test_files/unicycler", mode: 'copy'
+//   container     'staphb/multiqc:1.19'
+//   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+//   time          '1h'
+
+//   output:
+//   tuple val("unicycler"), file("long_reads_low_depth.fastq.gz"), file("short_reads*.fastq.gz"), emit: fastq
+
+//   when:
+//   task.ext.when == null || task.ext.when
+
+//   shell:
+//   """
+//   wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
+//   wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
+//   wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
+//   """
+// }
+
     // in DONUT FALLS WORKFLOW
     // hybracter and plassembler are on the to-do list
     // if (params.assembler =~ /hybracter/ ) {
@@ -1699,29 +1721,9 @@ process versions {
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
-process test_unicycler {
-  tag           "Downloading Unicycler test files"
-  label         "process_single"
-  publishDir    "${params.outdir}/test_files/unicycler", mode: 'copy'
-  container     'staphb/multiqc:1.19'
-  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
-  time          '1h'
 
-  output:
-  tuple val("unicycler"), file("long_reads_low_depth.fastq.gz"), file("short_reads*.fastq.gz"), emit: fastq
 
-  when:
-  task.ext.when == null || task.ext.when
-
-  shell:
-  """
-  wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
-  wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
-  wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
-  """
-}
-
-process test_donut_falls {
+process test {
   tag           "Downloading R10.4 reads"
   label         "process_single"
   publishDir    "${params.outdir}/test_files/df", mode: 'copy'
@@ -1731,7 +1733,6 @@ process test_donut_falls {
 
   output:
   tuple val("df"), file("test_files/test_nanopore.fastq.gz"), file("test_files/test_illumina_{1,2}.fastq.gz"), emit: fastq
-  tuple val("df_lr"), file("test_files/test_nanopore_only.fastq.gz"), emit: lrfastq
 
   when:
   task.ext.when == null || task.ext.when
@@ -1740,10 +1741,8 @@ process test_donut_falls {
   """
   wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
   tar -xvf dataset.tar.gz
-
-  cp test_files/test_nanopore.fastq.gz test_files/test_nanopore_only.fastq.gz
   """
-}
+
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
@@ -1993,47 +1992,22 @@ workflow {
 
   if (params.test) {
 
-    test_unicycler()
+    test()
 
-    test_unicycler.out.fastq
+    test.out.fastq
       .map { it ->
         meta = [id:it[0]] 
         tuple( meta,
           file("${it[1]}", checkIfExists: true),
           [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
       }
-      .set{ ch_unicycler_out }
+      .set{ ch_test_out }
 
-    test_donut_falls()
-
-    test_donut_falls.out.fastq
-      .map { it ->
-        meta = [id:it[0]] 
-        tuple( meta,
-          file("${it[1]}", checkIfExists: true),
-          [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
-      }
-      .set{ ch_test_df_out }
-
-    test_donut_falls.out.lrfastq
-      .map { it ->
-        meta = [id:it[0]] 
-        tuple( meta,
-          file("${it[1]}", checkIfExists: true),
-          null )
-      }
-      .set{ ch_test_dflr_out }
-
-    ch_unicycler_out
-      .mix(ch_test_df_out)
-      .mix(ch_test_dflr_out)
-      .set { ch_test }
-
-    ch_test
+    ch_test_out
       .map{it -> tuple(it[0], it[1])}
       .set { ch_test_nanopore }
 
-    ch_test
+    ch_test_out
       .filter{ it[2] }
       .map{it -> tuple(it[0], it[2])}
       .set { ch_test_illumina }
