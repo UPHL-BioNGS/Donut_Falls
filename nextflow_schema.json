@@ -14,6 +14,7 @@
         "config_file": {
             "type": "boolean",
             "description" : "Specifies if a config file is copied for the end user. Ends script.",
+            "default" : false,
             "hidden" : true
         },
         "outdir": { 
@@ -38,4 +39,5 @@
             "default": false,
             "hidden": true
         }
+    }
 }
