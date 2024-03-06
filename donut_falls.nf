@@ -297,8 +297,6 @@ process copy {
   task.ext.when == null || task.ext.when
 
   shell:
-  def args   = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${meta.id}"
   """
   #!/usr/bin/env python3
   import glob
@@ -872,7 +870,7 @@ process nanoplot_summary {
   publishDir    "${params.outdir}/summary", mode: 'copy'
   container     'staphb/nanoplot:1.42.0'
   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
-  time          '10m'
+  time          '30m'
 
   input:
   file(summary)
@@ -1433,7 +1431,7 @@ process versions {
 process test {
   tag           "Downloading R10.4 reads"
   label         "process_single"
-  publishDir    "${params.outdir}/test_files/df", mode: 'copy'
+  publishDir    "${params.outdir}/test_files/", mode: 'copy'
   container     'staphb/multiqc:1.19'
   errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
@@ -1732,7 +1730,7 @@ workflow {
 workflow.onComplete {
   println("Pipeline completed at: $workflow.complete")
   println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
-  println("The consensus fasta files can be found in ${params.outdir}/consensus")
+  println("The consensus fasta files can be found in ${params.outdir}/sample/consensus")
   println("The fasta files are from each phase of assembly. polca > polypolish > medaka > unpolished")
   println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }
