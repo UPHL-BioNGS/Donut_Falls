@@ -17,8 +17,6 @@ Donut Falls is a [Nextflow](https://www.nextflow.io/) workflow developed by [@er
 
 Donut Falls is also included in the staphb toolkit [staphb-toolkit](https://github.com/StaPH-B/staphb_toolkit). 
 
-Donut Falls, admittedly, is just a temporary stop-gap until nf-core's [genomeassembler](https://github.com/nf-core/genomeassembler) is released, so do not be suprised if this repository gets archived.
-
 We made a [wiki](https://github.com/UPHL-BioNGS/Donut_Falls/wiki), please read it!
 
 ## Wiki table of contents:
@@ -27,16 +25,15 @@ We made a [wiki](https://github.com/UPHL-BioNGS/Donut_Falls/wiki), please read i
   - [Using config files](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Usage#using-a-config-file)
   - [Parameters worth adjusting](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Usage#recommended-parameters-to-adjust)
   - [Examples](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Usage#examples)
-- [Subworkflows](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Subworkflows)
+  - [Using as a subworkflow](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Linking)
+- [Workflow DAG](https://github.com/UPHL-BioNGS/Donut_Falls/wiki#basic-diagram-of-the-workflow-and-subworkflows)
 - [FAQ](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/FAQ)
-
 
 ## Getting started
 
 ### Install dependencies
 - [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html)
 - [Singularity](https://singularity.lbl.gov/install-linux) or [Docker](https://docs.docker.com/get-docker/)
-
 
 ## Quick start
 
@@ -63,24 +60,13 @@ sample2,sample2.fastq.gz,,
 
 ### Switching assemblers
 There are currently several options for assembly
-- [flye](https://github.com/fenderglass/Flye)
-- [dragonflye](https://github.com/rpetit3/dragonflye)
-- [miniasm](https://github.com/rrwick/Minipolish)
+- [flye](https://github.com/fenderglass/Flye) (default)
 - [raven](https://github.com/lbcb-sci/raven)
 - [unicycler](https://github.com/rrwick/Unicycler) (requires short reads for hybrid assembly)
-- [lr_unicycler](https://github.com/rrwick/Unicycler) (uses unicycler's nanopore-only option)
-- [trycycler](https://github.com/rrwick/Trycycler) - please read [the wiki page](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Trycycler)
 
-These are specified with the `assembler` paramater.
+These are specified with the `assembler` paramater. If Illumina reads are found, then flye and raven assemblies will be polished with those reads.
 
-```
-# nanopore assembly followed by polishing if illumina files are supplied
-# assembler is flye, miniasm, raven, or lr_unicycler
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet <sample_sheet.csv> --assembler < assembler >
-
-# hybrid assembly with unicycler where both nanopore and illumina files are required
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet <sample_sheet.csv> --assembler unicycler
-```
+Note: more than one assembler can be chosen (i.e. `params.assembler = 'flye,raven'`). This will run the input files on each assembler listed. Listing an assembler more than once will not create additional assemblies with that tool (i.e. `params.assembler = 'flye,flye,flye'` will still only run the input files through flye once).
 
 ### Reading the sequencing summary file
 Although not used for anything else, the sequencing summary file can be read in and put through nanoplot to visualize the quality of a sequencing run. This is an optional file and can be set with 'params.sequencing_summary'. 
@@ -90,22 +76,46 @@ nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sequencing_summary <
 * WARNING : Does not work with _older_ versions of the summary file.
 
 
+## Examples
+```
+# nanopore assembly with flye followed by polishing if illumina files are supplied
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_sheet.csv
+
+# or with docker and specifying the assembler
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_sheet.csv --assembler flye
+
+# hybrid assembly with unicycler where both nanopore and illumina files are required
+nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_sheet.csv --assembler unicycler
+
+# assembling with all three asssemblers
+# specifying the results to be stored in 'donut_falls_test_results' instead of 'donut_falls'
+# using docker instead of singularity
+nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet.csv --assembler unicycler,flye,raven
+
+
+# using some test files (requires internet connection)
+nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet.csv --test
+
+# same as above
+nextflow run UPHL-BioNGS/Donut_Falls -profile docker,test --sample_sheet sample_sheet.csv
+```
+
 ## Credits
 
 Donut Falls would not be possible without
-- [bgzip](https://github.com/samtools/htslib) : file compression after filtlong
+- [bandage](https://github.com/rrwick/Bandage) : visualize gfa files
 - [busco](https://gitlab.com/ezlab/busco) : assessment of assembly quality
-- [circlator](https://github.com/sanger-pathogens/circlator) : rotating circular assembled chromosomes and plasmids
-- [dragonflye](https://github.com/rpetit3/dragonflye) : de novo assembly (params.assembler = 'dragonflye')
-- [fastp](https://github.com/OpenGene/fastp) : cleaning illuming reads
-- [filtlong](https://github.com/rrwick/Filtlong) : prioritizing high quality reads for assembly
+- [bwa](https://github.com/lh3/bwa) : aligning reads for polypolish
+- [circulocov](https://github.com/erinyoung/CirculoCov) : read depth per contig
+- [dnaapler](https://github.com/gbouras13/dnaapler) : rotation
+- [fastp](https://github.com/OpenGene/fastp) : cleaning illumina reads (default values) and nanopore reads (minimum length = 1,000 & minimum Q = 12)
 - [flye](https://github.com/fenderglass/Flye) : de novo assembly (default assembler)
 - [gfastats](https://github.com/vgl-hub/gfastats) : assessment of assembly
-- [masurca](https://github.com/alekseyzimin/masurca) : hybrid assembly options (params.assembler = 'masurca')
 - [medaka](https://github.com/nanoporetech/medaka) : polishing with nanopore reads
-- [miniasm and minipolish](https://github.com/rrwick/Minipolish) : de novo assembly option (params.assembler = 'miniasm')
+- [multiqc](https://multiqc.info/) : amalgamation of results
 - [nanoplot](https://github.com/wdecoster/NanoPlot) : fastq file QC visualization
-- [polca](https://github.com/alekseyzimin/masurca) : polishing assemblies with Illumina reads
+- [polypolish](https://github.com/rrwick/Polypolish) : reduces sequencing artefacts through polishing with Illumina reads
+- [pypolca](https://github.com/gbouras13/pypolca) : reduces sequencing artefacts through polishing with Illumina reads
+- [rasusa](https://github.com/mbhall88/rasusa) : subsampling nanopore reads to 150X depth
 - [raven](https://github.com/lbcb-sci/raven) : de novo assembly option (params.assembler = 'miniasm')
-- [trycycler](https://github.com/rrwick/Trycycler) : reconciles different assemblies (params.assembler = 'trycycler') 
-- [unicycler](https://github.com/rrwick/Unicycler) : hybrid assembly option (params.assembler = 'unicycler') or de novo assembly option (params.assembler = 'lr_unicycler')
+- [unicycler](https://github.com/rrwick/Unicycler) : hybrid assembly option (params.assembler = 'unicycler')

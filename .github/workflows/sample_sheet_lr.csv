@@ -1,0 +1,3 @@
+sample,fastq
+test,test_files/test_nanopore.fastq.gz
+test2,test_files/test_nanopore_only.fastq.gz
