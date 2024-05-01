@@ -17,19 +17,16 @@
             "properties": {
                 "sample_sheet": {
                     "type": "string",
-                    "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)",
-                    "hidden": false
+                    "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)"
                 },
                 "outdir": { 
                     "type": "string", 
                     "description": "Specifies where results are saved",
-                    "hidden": false,
                     "default": "donut_falls"
                 },
                 "sequencing_summary": { 
                     "type": "string", 
-                    "description": "input channel for nanopore sequencing summary file (optional)",
-                    "hidden": false
+                    "description": "input channel for nanopore sequencing summary file (optional)"
                 }
             }
         },
@@ -37,15 +34,11 @@
             "title": "Pipeline Configuration options",
             "type": "object",
             "description": "Options to configure how the workflow runs.",
-            "required": [
-                "assembler"
-            ],
             "properties": {
                 "assembler": { 
                     "type": "string", 
                     "description": "Specifies which assembler is/assemblers are going to be used.",
-                    "default" : "flye",
-                    "hidden": true
+                    "default" : "flye"
                 }
             }
         },
