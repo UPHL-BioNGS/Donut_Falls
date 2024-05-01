@@ -191,7 +191,7 @@ process busco {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    busco: \$( busco --version | awk '{print NF}' )
+    busco: \$( busco --version | awk '{print \$NF}' )
   END_VERSIONS
   """
 }
@@ -226,7 +226,7 @@ process bwa {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    bwa: \$(bwa 2>&1 | grep -i version | awk '{print NF}')
+    bwa: \$(bwa 2>&1 | grep -i version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -271,7 +271,7 @@ process circulocov {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    circulocov: \$(circulocov -v | awk '{print NF}')
+    circulocov: \$(circulocov -v | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -382,7 +382,7 @@ process dnaapler {
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/dnaapler:0.7.0'
-  errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
+  //errorStrategy { task.attempt < 2 ? 'retry' : 'ignore'}
   time          '1h'
 
   input:
@@ -405,11 +405,12 @@ process dnaapler {
     --prefix ${prefix} \
     --output dnaapler \
     --threads ${task.cpus} \
-    --ignore ${ignore}
+    --ignore ${ignore} || \
+    cp ${fasta} dnaapler/${prefix}_reoriented.fasta
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    dnaapler: \$(dnaapler --version | awk '{print NF}')
+    dnaapler: \$(dnaapler --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -450,11 +451,11 @@ process fastp {
       -h fastp/${prefix}_fastp_sr.html \
       -j fastp/${prefix}_fastp_sr.json
 
-    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print NF}' | head -n 1 )
+    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print \$NF}' | head -n 1 )
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-      fastp: \$(fastp --version 2>&1 | awk '{print NF}' )
+      fastp: \$(fastp --version 2>&1 | awk '{print \$NF}' )
     END_VERSIONS
     """
   } else {
@@ -467,11 +468,11 @@ process fastp {
       -h fastp/${prefix}_fastp_lr.html \
       -j fastp/${prefix}_fastp_lr.json
 
-    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print NF}' | head -n 1 )
+    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print \$NF}' | head -n 1 )
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-      fastp: \$(fastp --version 2>&1 | awk '{print NF}')
+      fastp: \$(fastp --version 2>&1 | awk '{print \$NF}')
     END_VERSIONS
     """
   }
@@ -519,7 +520,7 @@ process flye {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    flye: \$( flye --version | awk '{print NF}')
+    flye: \$( flye --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -563,7 +564,7 @@ process gfastats {
   
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    gfastats: \$( gfastats -v | head -n 1 | awk '{print NF}')
+    gfastats: \$( gfastats -v | head -n 1 | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -717,7 +718,7 @@ process medaka {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    medaka: \$( medaka --version | awk '{print NF}')
+    medaka: \$( medaka --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -943,7 +944,7 @@ process nanoplot_summary {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    nanoplot: \$(NanoPlot --version | awk '{print NF}')
+    nanoplot: \$(NanoPlot --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -987,7 +988,7 @@ process nanoplot {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    nanoplot: \$(NanoPlot --version | awk '{print NF}')
+    nanoplot: \$(NanoPlot --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -1033,7 +1034,7 @@ process polypolish {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    polypolish: \$(polypolish --version | awk '{print NF}')
+    polypolish: \$(polypolish --version | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -1089,7 +1090,7 @@ process pypolca {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    pypolca: \$(pypolca --version | head -n 1 | awk '{print NF}')
+    pypolca: \$(pypolca --version | head -n 1 | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -1124,7 +1125,7 @@ process rasusa {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    rasusa: \$(rasusa --version | awk '{print NF}' )
+    rasusa: \$(rasusa --version | awk '{print \$NF}' )
   END_VERSIONS
   """
 }
@@ -1163,7 +1164,7 @@ process raven {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    raven: \$( raven --version | awk '{print NF}' )
+    raven: \$( raven --version | awk '{print \$NF}' )
   END_VERSIONS
   """
 }
@@ -1193,6 +1194,8 @@ process summary {
   import json
   import csv
   from os.path import exists
+
+  exit(1)
 
   def file_to_dict(file, header, delim):
     dict = {}
