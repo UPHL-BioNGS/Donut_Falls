@@ -4,38 +4,70 @@
     "title": "Donut Falls Parameters",
     "description": "Donut Falls is a workflow for assembly from nanopore or nanopore/illumina reads",
     "type": "object",
-    "properties": {
-        "assembler": { 
-            "type": "string", 
-            "description": "Specifies which assembler is/assemblers are going to be used.",
-            "default" : "flye",
-            "hidden": true
+    "definitions":{
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Define where the pipeline should find input data and save output data.",
+            "required": [
+                "sample_sheet",
+                "outdir"
+            ],
+            "properties": {
+                "sample_sheet": {
+                    "type": "string",
+                    "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)",
+                    "hidden": false
+                },
+                "outdir": { 
+                    "type": "string", 
+                    "description": "Specifies where results are saved",
+                    "hidden": false,
+                    "default": "donut_falls"
+                },
+                "sequencing_summary": { 
+                    "type": "string", 
+                    "description": "input channel for nanopore sequencing summary file (optional)",
+                    "hidden": false
+                }
+            }
         },
-        "config_file": {
-            "type": "boolean",
-            "description" : "Specifies if a config file is copied for the end user. Ends script.",
-            "hidden" : true
+        "pipeline_configuration_options": {
+            "title": "Pipeline Configuration options",
+            "type": "object",
+            "description": "Options to configure how the workflow runs.",
+            "required": [
+                "assembler"
+            ],
+            "properties": {
+                "assembler": { 
+                    "type": "string", 
+                    "description": "Specifies which assembler is/assemblers are going to be used.",
+                    "default" : "flye",
+                    "hidden": true
+                }
+            }
         },
-        "outdir": { 
-            "type": "string", 
-            "description": "Specifies where results are saved",
-            "hidden": false,
-            "default": "donut_falls"
-        },
-        "sample_sheet": {
-            "type": "string",
-            "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)",
-            "hidden": false
-        },
-        "sequencing_summary": { 
-            "type": "string", 
-            "description": "input channel for nanopore sequencing summary file (optional)",
-            "hidden": false
-        },
-        "test":{
-            "type": "boolean",
-            "description": "Downloads test file",
-            "default": false,
-            "hidden": true
+        "generic_options": {
+            "title": "Generic options",
+            "type": "object",
+            "fa_icon": "fas fa-file-import",
+            "description": "Less common options for the pipeline, typically set in a config file.",
+            "help_text": "These options are common to all nf-core pipelines and allow you to customize some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
+            "properties": {
+                "config_file": {
+                    "type": "boolean",
+                    "description" : "Specifies if a config file is copied for the end user. Ends script.",
+                    "hidden" : true
+                },
+                "test":{
+                    "type": "boolean",
+                    "description": "Downloads test file",
+                    "default": false,
+                    "hidden": true
+                }
+            }
         }
+    }
 }
