@@ -69,5 +69,16 @@
                 }
             }
         }
-    }
+    },
+    "allOf": [
+        {
+            "$ref": "#/definitions/input_output_options"
+        },
+        {
+            "$ref": "#/definitions/pipeline_configuration_options"
+        },
+        {
+            "$ref": "#/definitions/generic_options"
+        }
+    ]
 }
