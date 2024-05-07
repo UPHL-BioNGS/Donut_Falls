@@ -1221,12 +1221,57 @@ process summary {
   task.ext.when == null || task.ext.when
 
   """
-  #!/usr/bin/env python3
+    #!/usr/bin/env python3
 
   import glob
   import json
   import csv
   from os.path import exists
+
+  def busco_results():
+    dict = {}
+    busco_files = glob.glob("short_summary*txt")
+    for file in busco_files:
+      sample_analysis = file.split(".")[-2]
+      with open(file, 'r') as f:
+        for line in f:
+          if "C:" and "S:" and "D:" and "F:" and "M:" and "n:" in line:
+            busco_dict[sample_analysis] = line.strip()
+            break
+    return dict
+
+  def circulocov_results():
+    dict = {}
+    circulocov_files = glob.glob("*overall_summary.txt")
+    for file in circulocov_files:
+      sample_analysis = file.replace("_overall_summary.txt", "").replace("_reoriented", "")
+      dict[sample_analysis] = {}
+      with open(file, 'r') as f:
+        for line in f:
+          parts = line.split()
+          if parts[2] == "all":
+            dict[sample_analysis]["coverage"] = parts[7]
+
+          if parts[2] == "missing":
+            if len(parts) > 8:
+              unmapped_illumina = parts[8]
+            else:
+              unmapped_illumina = 0
+          
+            dict[sample_analysis]["unmapped_nanopore"] = parts[4]
+            dict[sample_analysis]["unmapped_illumina"] = unmapped_illumina
+    return dict
+
+  def fastp_results():
+    dict = {}
+    fastp_files = glob.glob("*_fastp_sr.json")
+    for fastp_file in fastp_files:
+      sample = fastp_file.replace('_fastp_sr.json', '')
+      with open(fastp_file, 'r') as file:
+        data = json.load(file)
+        total_reads = data['summary']['before_filtering']['total_reads']
+        dict[sample] = total_reads
+    return dict
 
   def file_to_dict(file, header, delim):
     dict = {}
@@ -1252,6 +1297,18 @@ process summary {
     with open('donut_falls_summary.json', 'w') as json_file:
       json.dump(dict, json_file, indent=4)
 
+  def mash_file(file):
+    dict = {}
+    with open(file, mode = 'r') as file:
+      reader = csv.DictReader(file, delimiter='\\t', fieldnames=['illumina','nanopore', 'dist', 'pvalue', 'hash'])
+      for row in reader:
+        key = row['nanopore'].replace('.fastq.gz', '')
+        dict[key] = row
+    return dict
+
+  def tsv_file(dict):
+    final_dict = {}
+
     with open('donut_falls_summary.tsv', 'w') as tsv_file:
       i = 0
       sorted_keys = sorted(dict.keys())
@@ -1262,23 +1319,11 @@ process summary {
           i = i+1
         w.writerow(dict[sample])
 
-  def mash_file(file):
-    dict = {}
-    with open(file, mode = 'r') as file:
-      reader = csv.DictReader(file, delimiter='\\t', fieldnames=['illumina','nanopore', 'dist', 'pvalue', 'hash'])
-      for row in reader:
-        key = row['nanopore'].replace('.fastq.gz', '')
-        dict[key] = row
-    return dict
-
   def main():
     if exists('nanoplot_summary.csv') :
       nanoplot_dict = file_to_dict('nanoplot_summary.csv', 'sample', ',')
     else:
       nanoplot_dict = {}
-
-    print(nanoplot_dict)
-    exit(0)
 
     if exists('mash_summary.tsv') :
       mash_dict = mash_file('mash_summary.tsv')
@@ -1286,7 +1331,7 @@ process summary {
       mash_dict = {}
 
     if exists('pypolca_summary.tsv') :
-      pypolca_dict  = file_to_dict('pypolca_summary.tsv', 'sample', '\t')
+      pypolca_dict  = file_to_dict('pypolca_summary.tsv', 'sample', '\\t')
     else:
       pypolca_dict = {}
 
@@ -1295,35 +1340,11 @@ process summary {
     else:
       gfastats_dict = {}
 
-    busco_dict = {}
-    busco_files = glob.glob("short_summary*txt")
-    for file in busco_files:
-      sample_analysis = file.split(".")[-2]
-      with open(file, 'r') as f:
-        for line in f:
-          if "C:" and "S:" and "D:" and "F:" and "M:" and "n:" in line:
-            busco_dict[sample_analysis] = line.strip()
-            break
+    fastp_dict = fastp_results()
 
-    circulocov_dict = {}
-    circulocov_files = glob.glob("*overall_summary.txt")
-    for file in circulocov_files:
-      sample_analysis = file.replace("_overall_summary.txt", "").replace("_reoriented", "")
-      circulocov_dict[sample_analysis] = {}
-      with open(file, 'r') as f:
-        for line in f:
-          parts = line.split()
-          if parts[2] == "all":
-            circulocov_dict[sample_analysis]["coverage"] = parts[7]
+    busco_dict = busco_results()
 
-          if parts[2] == "missing":
-            if len(parts) > 8:
-              unmapped_illumina = parts[8]
-            else:
-              unmapped_illumina = 0
-          
-            circulocov_dict[sample_analysis]["unmapped_nanopore"] = parts[4]
-            circulocov_dict[sample_analysis]["unmapped_illumina"] = unmapped_illumina
+    circulocov_dict = circulocov_results()
       
     final_results = {}
     assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
@@ -1336,16 +1357,25 @@ process summary {
       final_results[key]['mean_read_length'] = nanoplot_dict[key]['mean_read_length']
       final_results[key]['mean_qual']        = nanoplot_dict[key]['mean_qual']
 
+      # from fastp
+      if key in fastp_dict.keys():
+        final_results[key]['total_illumina_reads'] = fastp_dict[key]
+      else:
+        final_results[key]['total_illumina_reads'] = 0
+
       # from mash
       if key in mash_dict.keys():
         final_results[key]['nanopore_illumina_mash_distance'] = mash_dict[key]['dist']
       else:
-        final_results[key]['nanopore_illumina_mash_distance'] = 0
+        final_results[key]['nanopore_illumina_mash_distance'] = "NF"
+
+      final_results[key]["assembler"] = "${params.assembler}"
 
       # for each assembler
       for assembler in assemblers:
+        final_results[key][assembler] = {}
         if key + "_" + assembler in gfastats_dict.keys():
-          final_results[key]["assembler"] = "${params.assembler}"
+          final_results[key]["assembler"] = assembler    
 
           # gfastats results
           total_length = 0
@@ -1355,58 +1385,66 @@ process summary {
             if gfastats_dict[key + "_" + assembler][contig]["circular"] == "Y":
               num_circular = num_circular + 1
             
-          final_results[key][assembler + '_total_length'] = total_length
-          final_results[key][assembler + '_num_contigs']  = len(gfastats_dict[key + "_" + assembler].keys())
-          final_results[key][assembler + '_circ_contigs'] = num_circular       
+          final_results[key][assembler]['total_length'] = total_length
+          final_results[key][assembler]['num_contigs']  = len(gfastats_dict[key + "_" + assembler].keys())
+          final_results[key][assembler]['circ_contigs'] = num_circular       
                     
           # circulocov results
           if key + "_" + assembler in circulocov_dict.keys():
             if 'coverage' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler + '_coverage']          = circulocov_dict[key + '_' + assembler]['coverage']
+              final_results[key][assembler]['coverage']          = circulocov_dict[key + '_' + assembler]['coverage']
             else:
-              final_results[key][assembler + '_coverage']          = "NF"
+              final_results[key][assembler]['coverage']          = "NF"
 
             if 'unmapped_nanopore' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler + '_unmapped_nanopore'] = circulocov_dict[key + '_' + assembler]['unmapped_nanopore']
+              final_results[key][assembler]['unmapped_nanopore']    = circulocov_dict[key + '_' + assembler]['unmapped_nanopore']
+              final_results[key][assembler]['unmapped_nanopore_pc'] = "{:.2f}".format(final_results[key][assembler]['unmapped_nanopore'] / nanoplot_dict[key]['number_of_reads'] * 100)
             else:
-              final_results[key][assembler + '_unmapped_nanopore'] = "NF"
+              final_results[key][assembler]['unmapped_nanopore']    = "NF"
+              final_results[key][assembler]['unmapped_nanopore_pc'] = "NF"
               
             if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler + '_unmapped_illumina'] = circulocov_dict[key + '_' + assembler]['unmapped_illumina']
+              final_results[key][assembler]['unmapped_illumina'] = circulocov_dict[key + '_' + assembler]['unmapped_illumina']
+              if 'total_illumina_reads' in final_results[key].keys() and final_results[key]['total_illumina_reads'] > 0:
+                final_results[key][assembler]['unmapped_illumina_pc'] = "{:.2f}".format(final_results[key][assembler]['unmapped_illumina'] / final_results[key]['total_illumina_reads'] * 100 )
+              else:
+                final_results[key][assembler]['unmapped_illumina_pc'] = 0.0
             else:
-              final_results[key][assembler + '_unmapped_illumina'] = "NF"       
+              final_results[key][assembler]['unmapped_illumina'] = "NF"
+              final_results[key][assembler]['unmapped_illumina_pc'] = "NF"     
 
           # busco results
           if key + "_" + assembler in busco_dict.keys():
-            final_results[key][assembler + '_busco'] = busco_dict[key + "_" + assembler]
-          elif key + "_" + assembler + '_reoriented' in busco_dict.keys():                
-            final_results[key][assembler + '_busco'] = busco_dict[key + "_" + assembler + '_reoriented']
+            final_results[key][assembler]['busco'] = busco_dict[key + "_" + assembler]
+          elif key + "_" + assembler]['reoriented' in busco_dict.keys():                
+            final_results[key][assembler]['busco'] = busco_dict[key + "_" + assembler]['reoriented']
           else:
-            final_results[key][assembler + '_busco'] = "NF"
+            final_results[key][assembler]['busco'] = "NF"
 
           if assembler != 'unicycler':
             for step in ['polypolish', 'pypolca', 'medaka']:
-              if key + "_" + assembler + '_' + step in busco_dict.keys():                
-                final_results[key][assembler + '_busco_' + step ] = busco_dict[key + "_" + assembler + '_' + step]
+              if key + "_" + assembler]['' + step in busco_dict.keys():                
+                final_results[key][assembler]['busco_' + step ] = busco_dict[key + "_" + assembler]['' + step]
               else:
-                final_results[key][assembler + '_busco_' + step ] = 'NF'
+                final_results[key][assembler]['busco_' + step ] = 'NF'
 
           # pypolca results
           if key + "_" + assembler in pypolca_dict.keys():
             if 'Consensus_Quality_Before_Polishing' in pypolca_dict[key + "_" + assembler].keys():
-              final_results[key][assembler + '_Consensus_Quality_Before_Polishing'] = pypolca_dict[key + "_" + assembler]['Consensus_Quality_Before_Polishing']
+              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = pypolca_dict[key + "_" + assembler]['Consensus_Quality_Before_Polishing']
             else:
-              final_results[key][assembler + '_Consensus_Quality_Before_Polishing'] = "NF"
+              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = "NF"
             if 'Consensus_QV_Before_Polishing' in pypolca_dict[key + "_" + assembler].keys():
-              final_results[key][assembler + '_Consensus_QV_Before_Polishing']      = pypolca_dict[key + "_" + assembler]['Consensus_QV_Before_Polishing']
+              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = pypolca_dict[key + "_" + assembler]['Consensus_QV_Before_Polishing']
             else:
-              final_results[key][assembler + '_Consensus_QV_Before_Polishing']      = "NF"
+              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = "NF"
 
           elif assembler != 'unicycler':
-            final_results[key][assembler + '_Consensus_Quality_Before_Polishing'] = 0
-            final_results[key][assembler + '_Consensus_QV_Before_Polishing']      = 0
+            final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0
+            final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0
 
     final_file(final_results)
+#    tsv_file(final_results)
 
   if __name__ == "__main__":
       main()
