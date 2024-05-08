@@ -127,7 +127,7 @@ ch_input_files
 
 process bandage {
   tag           "${meta.id}"
-  label         "process_low"
+  label         'process_low'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/bandage:0.8.1'
   time          '10m'
@@ -274,7 +274,7 @@ process circulocov {
 
 process copy {
   tag           "${meta.id}"
-  label         "process_single"
+  label         'process_low'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
   time          '10m'
@@ -298,57 +298,81 @@ process copy {
 
   def gfastats_to_dict(header_dict):
     dict = {}
-    with open("gfastats_summary.csv", mode='r', newline='') as file:
+    with open('gfastats_summary.csv', mode='r') as file:
       reader = csv.DictReader(file)
       for row in reader:
-        if row["sample"] == header_dict['name'] + "_" + header_dict['assembler']:
-          key = row["Header"]
-
+        if row['sample'] == header_dict['name'] + '_' + header_dict['assembler']:
+          key = row['Header']
           dict[key] = row
     return dict
 
   def circulocov_to_dict(header_dict):
     dict = {}
-    with open("circulocov_summary.txt", mode='r', newline='') as file:
-        reader = csv.DictReader(file, delimiter="\t")
+    with open('circulocov_summary.txt', mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter='\\t')
         for row in reader:
-          if row["sample"].replace("_reoriented","") == header_dict['name'] + "_" + header_dict['assembler'] :
-            key = row["contigs"]
+          if row['sample'].replace('_reoriented','') == header_dict['name'] + '_' + header_dict['assembler'] :
+            key = row['contigs']
 
             dict[key] = row
     return dict
 
   def copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict):
     with open(fasta, 'r') as file:
-      with open(f"consensus/{header_dict['fasta']}", 'w') as outfile:
-          for line in file:
-            line = line.strip()
-            if line.startswith('>'):
-              contig = line.replace(">","").split()[0]
-              circular = gfa_dict[contig]['circular'].replace("Y","true").replace("N","false")
-              length = gfa_dict[contig]['Total segment length']
-              gc_per = gfa_dict[contig]['GC content %']
-              meandepth = circulocov_dict[contig]['nanopore_meandepth']
-              assembler = header_dict['assembler']
-              step = header_dict['step']
-              outfile.write(f">{contig} circ={circular} len={length} gc={gc_per} cov={meandepth} asmb={assembler} stp={step}\\n")
-            else:
-              outfile.write(f"{line}\\n")
+      fasta_dict = {}
+      for line in file:
+        line = line.strip()
+        if line.startswith('>'):
+          contig    = str(line.replace('>','').split()[0])
+          circular  = gfa_dict[contig]['circular'].replace('Y','true').replace('N','false')
+          length    = gfa_dict[contig]['Total segment length']
+          gc_per    = gfa_dict[contig]['GC content %']
+          meandepth = circulocov_dict[contig]['nanopore_meandepth']
+          assembler = header_dict['assembler']
+          step      = header_dict['step']
+          
+          # creating the header
+          header = '>' + contig
+          header = header + ' circ=' + circular
+          header = header + ' len=' + length
+          header = header + ' gc=' + gc_per
+          header = header + ' cov=' + meandepth
+          header = header + ' asmb=' + assembler 
+          if assembler != 'unicycler':
+            header = header + ' stp=' + step
+          header = header + '\\n'
+
+          # creating the dict
+          fasta_dict[contig] = {}
+          fasta_dict[contig]['seq']    = ''
+          fasta_dict[contig]['header'] = header
+          fasta_dict[contig]['length'] = int(length)
+
+        else:
+          fasta_dict[contig]['seq'] = fasta_dict[contig]['seq'] + line
+    
+    sorted_dict = dict(sorted(fasta_dict.items(), key=lambda item: item[1]['length'], reverse = True))
+
+    with open(f"consensus/{header_dict['fasta']}", 'w') as outfile:    
+      for contig in sorted_dict:
+        seq = '\\n'.join([fasta_dict[contig]['seq'][i:i+70] for i in range(0, len(fasta_dict[contig]['seq']), 70)])
+        outfile.write(fasta_dict[contig]['header'])
+        outfile.write(seq + '\\n')
 
   def main():
-    os.mkdir("consensus")
+    os.mkdir('consensus')
     header_dict = {}
-    fasta = glob.glob("*.fasta")[0]
+    fasta = glob.glob('*.fasta')[0]
     header_dict['fasta'] = fasta
 
-    name = fasta.replace(".fasta", "")
+    name = fasta.replace('.fasta', '')
 
     assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
-    steps = ["reoriented", 'polypolish', 'pypolca', 'medaka']
+    steps = ['reoriented', 'polypolish', 'pypolca', 'medaka']
     for step in steps:
       if step in name:
         header_dict['step'] = step
-        name = name.replace(f"_{step}","")
+        name = name.replace(f"_{step}",'')
         break
 
     if 'step' not in header_dict.keys():
@@ -357,7 +381,7 @@ process copy {
     for assembler in assemblers:
       if assembler in name:
         header_dict['assembler'] = assembler
-        name = name.replace(f"_{assembler}","")
+        name = name.replace(f"_{assembler}",'')
         break
 
     header_dict['name'] = name
@@ -367,7 +391,7 @@ process copy {
 
     copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict)
 
-  if __name__ == "__main__":
+  if __name__ == '__main__':
     main()
   """
 }
@@ -492,13 +516,14 @@ process flye {
   task.ext.when == null || task.ext.when
 
   shell:
-  def args   = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${meta.id}"
+  def args      = task.ext.args   ?: ''
+  def read_type = task.ext.read_type ?: '--nano-hq'
+  def prefix    = task.ext.prefix ?: "${meta.id}"
   """
   mkdir -p flye
 
   flye ${args} \
-    --nano-raw ${fastq} \
+    ${read_type} ${fastq} \
     --threads ${task.cpus} \
     --out-dir flye
 
@@ -978,7 +1003,7 @@ process png {
   tuple val(meta), file(png)
 
   output:
-  path("*_mqc.png"), emit: png
+  path("bandage_*_mqc.png"), emit: png
 
   when:
   task.ext.when == null || task.ext.when
@@ -1017,13 +1042,13 @@ process png {
         combined_image.paste(image, (offset, 0))
         offset += image.width
 
-      combined_image.save("${prefix}_bandage_mqc.png")
+      combined_image.save("bandage_${prefix}_mqc.png")
 
       for image in images_with_titles:
           image.close()
 
     else:
-      shutil.copy(png_files[0], "${prefix}_bandage_mqc.png")
+      shutil.copy(png_files[0], "bandage_${prefix}_mqc.png")
 
   if __name__ == "__main__":
       main()
@@ -1096,7 +1121,7 @@ process pypolca {
   task.ext.when == null || task.ext.when
 
   shell:
-  def args   = task.ext.args   ?: ''
+  def args   = task.ext.args   ?: '--careful'
   def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_polypolish','')}"
   """
   pypolca run ${args}\
@@ -1221,7 +1246,7 @@ process summary {
   task.ext.when == null || task.ext.when
 
   """
-    #!/usr/bin/env python3
+  #!/usr/bin/env python3
 
   import glob
   import json
@@ -1229,232 +1254,319 @@ process summary {
   from os.path import exists
 
   def busco_results():
-    dict = {}
-    busco_files = glob.glob("short_summary*txt")
-    for file in busco_files:
-      sample_analysis = file.split(".")[-2]
-      with open(file, 'r') as f:
-        for line in f:
-          if "C:" and "S:" and "D:" and "F:" and "M:" and "n:" in line:
-            busco_dict[sample_analysis] = line.strip()
-            break
-    return dict
+      dict = {}
+      files = glob.glob('short_summary*txt')
+      for file in files:
+        sample_analysis = file.split('.')[-2]
+        with open(file, 'r') as f:
+          for line in f:
+            if 'C:' and 'S:' and 'D:' and 'F:' and 'M:' and 'n:' in line:
+              dict[sample_analysis] = line.strip()
+              break
+      return dict
 
   def circulocov_results():
-    dict = {}
-    circulocov_files = glob.glob("*overall_summary.txt")
-    for file in circulocov_files:
-      sample_analysis = file.replace("_overall_summary.txt", "").replace("_reoriented", "")
-      dict[sample_analysis] = {}
-      with open(file, 'r') as f:
-        for line in f:
-          parts = line.split()
-          if parts[2] == "all":
-            dict[sample_analysis]["coverage"] = parts[7]
+      dict = {}
+      files = glob.glob('*overall_summary.txt')
+      for file in files:
+        sample_analysis = file.replace('_overall_summary.txt', '').replace('_reoriented', '')
+        dict[sample_analysis] = {}
+        with open(file, 'r') as f:
+          for line in f:
+            parts = line.split()
+            if parts[2] == 'all':
+              dict[sample_analysis]['coverage'] = parts[7]
 
-          if parts[2] == "missing":
-            if len(parts) > 8:
-              unmapped_illumina = parts[8]
-            else:
-              unmapped_illumina = 0
-          
-            dict[sample_analysis]["unmapped_nanopore"] = parts[4]
-            dict[sample_analysis]["unmapped_illumina"] = unmapped_illumina
-    return dict
+            if parts[2] == 'missing':
+              if len(parts) > 8:
+                unmapped_illumina = parts[8]
+              else:
+                unmapped_illumina = 0
+
+              dict[sample_analysis]['unmapped_nanopore'] = parts[4]
+              dict[sample_analysis]['unmapped_illumina'] = unmapped_illumina
+      return dict
 
   def fastp_results():
-    dict = {}
-    fastp_files = glob.glob("*_fastp_sr.json")
-    for fastp_file in fastp_files:
-      sample = fastp_file.replace('_fastp_sr.json', '')
-      with open(fastp_file, 'r') as file:
-        data = json.load(file)
-        total_reads = data['summary']['before_filtering']['total_reads']
-        dict[sample] = total_reads
-    return dict
+      dict = {}
+      files = glob.glob('*_fastp_sr.json')
+      for file in files:
+        sample = file.replace('_fastp_sr.json', '')
+        with open(file, 'r') as f:
+          data = json.load(f)
+          total_reads = data['summary']['before_filtering']['total_reads']
+          dict[sample] = total_reads
+      return dict
 
   def file_to_dict(file, header, delim):
-    dict = {}
-    with open(file, mode='r', newline='') as file:
-      reader = csv.DictReader(file, delimiter=delim)
-      for row in reader:
-        key = row[header]
-        dict[key] = row
-    return dict
+      dict = {}
+      with open(file, mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter=delim)
+        for row in reader:
+          key = row[header]
+          dict[key] = row
+      return dict
 
   def file_to_dict_uniq(file, header, header2, delim):
-    dict = {}
-    with open(file, mode='r', newline='') as file:
-      reader = csv.DictReader(file, delimiter=delim)
-      for row in reader:
-        if row[header] not in dict.keys():
-          dict[row[header]] = {}
-        key = row[header] + "_" + row[header2]
-        dict[row[header]][key] = row
-    return dict
+      dict = {}
+      with open(file, mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter=delim)
+        for row in reader:
+          if row[header] not in dict.keys():
+            dict[row[header]] = {}
+          key = row[header] + '_' + row[header2]
+          dict[row[header]][key] = row
+      return dict
 
   def final_file(dict):
-    with open('donut_falls_summary.json', 'w') as json_file:
-      json.dump(dict, json_file, indent=4)
+      with open('donut_falls_summary.json', 'w') as json_file:
+        json.dump(dict, json_file, indent=4)
 
   def mash_file(file):
-    dict = {}
-    with open(file, mode = 'r') as file:
-      reader = csv.DictReader(file, delimiter='\\t', fieldnames=['illumina','nanopore', 'dist', 'pvalue', 'hash'])
-      for row in reader:
-        key = row['nanopore'].replace('.fastq.gz', '')
-        dict[key] = row
-    return dict
+      dict = {}
+      with open(file, mode = 'r') as file:
+        reader = csv.DictReader(file, delimiter='\\t', fieldnames=['illumina','nanopore', 'dist', 'pvalue', 'hash'])
+        for row in reader:
+          key = row['nanopore'].replace('.fastq.gz', '')
+          dict[key] = row
+      return dict
 
   def tsv_file(dict):
-    final_dict = {}
+      final_dict = {}
+      with open('donut_falls_summary.tsv', 'w') as tsv:
+        i = 0
+        sorted_keys = sorted(dict.keys())
+        for key in sorted_keys:
+          final_dict[key] = {}
+          final_dict[key]['name'] = dict[key]['name']
+          final_dict[key]['number_of_reads'] = dict[key]['number_of_reads']
+          final_dict[key]['mean_read_length'] = dict[key]['mean_read_length']
+          final_dict[key]['mean_qual'] = dict[key]['mean_qual']
+          final_dict[key]['total_illumina_reads'] = dict[key]['total_illumina_reads']
+          final_dict[key]['nanopore_illumina_mash_distance'] = dict[key]['nanopore_illumina_mash_distance']
+          final_dict[key]['assemblers'] = dict[key]['assemblers']
+          
+          if 'flye' in dict[key]['assemblers'].replace('dragonflye','dragon'):
+            if 'flye' in dict[key].keys():
+              final_dict[key]['flye_total_length'] = dict[key]['flye']['total_length']
+              final_dict[key]['flye_num_contigs'] = dict[key]['flye']['num_contigs']
+              final_dict[key]['flye_circ_contigs'] = dict[key]['flye']['circ_contigs']
+              final_dict[key]['flye_coverage'] = dict[key]['flye']['coverage']
+              final_dict[key]['flye_unmapped_nanopore'] = dict[key]['flye']['unmapped_nanopore']
+              final_dict[key]['flye_unmapped_nanopore_pc'] = dict[key]['flye']['unmapped_nanopore_pc']
+              final_dict[key]['flye_unmapped_illumina'] = dict[key]['flye']['unmapped_illumina']
+              final_dict[key]['flye_unmapped_illumina_pc'] = dict[key]['flye']['unmapped_illumina_pc']
+              final_dict[key]['flye_busco'] = dict[key]['flye']['busco']
+              final_dict[key]['flye_busco_polished'] = dict[key]['flye']['busco_pypolca']
+              final_dict[key]['flye_quality_before_polishing'] = dict[key]['flye']['Consensus_Quality_Before_Polishing']
+              final_dict[key]['flye_QV_before_polishing'] = dict[key]['flye']['Consensus_QV_Before_Polishing']
+            else:
+              final_dict[key]['flye_total_length'] = 0
+              final_dict[key]['flye_num_contigs'] = 0
+              final_dict[key]['flye_circ_contigs'] = 0
+              final_dict[key]['flye_coverage'] = 0
+              final_dict[key]['flye_unmapped_nanopore'] = 0
+              final_dict[key]['flye_unmapped_nanopore_pc'] = 0
+              final_dict[key]['flye_unmapped_illumina'] = 0
+              final_dict[key]['flye_unmapped_illumina_pc'] = 0
+              final_dict[key]['flye_busco'] = 'NF'
+              final_dict[key]['flye_busco_polished'] = 'NF'
+              final_dict[key]['flye_quality_before_polishing'] = 0
+              final_dict[key]['flye_QV_before_polishing'] = 0            
 
-    with open('donut_falls_summary.tsv', 'w') as tsv_file:
-      i = 0
-      sorted_keys = sorted(dict.keys())
-      for sample in sorted_keys:
-        w = csv.DictWriter(tsv_file, dict[sample].keys(), delimiter='\\t')
-        if i < 1 :
-          w.writeheader()
-          i = i+1
-        w.writerow(dict[sample])
+          if 'raven' in dict[key]['assemblers']:
+            if 'raven' in dict[key].keys():
+              final_dict[key]['raven_total_length'] = dict[key]['raven']['total_length']
+              final_dict[key]['raven_num_contigs'] = dict[key]['raven']['num_contigs']
+              final_dict[key]['raven_circ_contigs'] = dict[key]['raven']['circ_contigs']
+              final_dict[key]['raven_coverage'] = dict[key]['raven']['coverage']
+              final_dict[key]['raven_unmapped_nanopore'] = dict[key]['raven']['unmapped_nanopore']
+              final_dict[key]['raven_unmapped_nanopore_pc'] = dict[key]['raven']['unmapped_nanopore_pc']
+              final_dict[key]['raven_unmapped_illumina'] = dict[key]['raven']['unmapped_illumina']
+              final_dict[key]['raven_unmapped_illumina_pc'] = dict[key]['raven']['unmapped_illumina_pc']
+              final_dict[key]['raven_busco'] = dict[key]['raven']['busco']
+              final_dict[key]['raven_busco_polished'] = dict[key]['raven']['busco_pypolca']
+              final_dict[key]['raven_quality_before_polishing'] = dict[key]['raven']['Consensus_Quality_Before_Polishing']
+              final_dict[key]['raven_QV_before_polishing'] = dict[key]['raven']['Consensus_QV_Before_Polishing']
+            else:
+              final_dict[key]['raven_total_length'] = 0
+              final_dict[key]['raven_num_contigs'] = 0
+              final_dict[key]['raven_circ_contigs'] = 0
+              final_dict[key]['raven_coverage'] = 0
+              final_dict[key]['raven_unmapped_nanopore'] = 0
+              final_dict[key]['raven_unmapped_nanopore_pc'] = 0
+              final_dict[key]['raven_unmapped_illumina'] = 0
+              final_dict[key]['raven_unmapped_illumina_pc'] = 0
+              final_dict[key]['raven_busco'] = 'NF'
+              final_dict[key]['raven_busco_polished'] = 'NF'
+              final_dict[key]['raven_quality_before_polishing'] = 0
+              final_dict[key]['raven_QV_before_polishing'] = 0            
+
+          if 'unicycler' in dict[key]['assemblers']:
+            if 'unicycler' in dict[key].keys():
+              final_dict[key]['unicycler_total_length'] = dict[key]['unicycler']['total_length']
+              final_dict[key]['unicycler_num_contigs'] = dict[key]['unicycler']['num_contigs']
+              final_dict[key]['unicycler_circ_contigs'] = dict[key]['unicycler']['circ_contigs']
+              final_dict[key]['unicycler_coverage'] = dict[key]['unicycler']['coverage']
+              final_dict[key]['unicycler_unmapped_nanopore'] = dict[key]['unicycler']['unmapped_nanopore']
+              final_dict[key]['unicycler_unmapped_nanopore_pc'] = dict[key]['unicycler']['unmapped_nanopore_pc']
+              final_dict[key]['unicycler_unmapped_illumina'] = dict[key]['unicycler']['unmapped_illumina']
+              final_dict[key]['unicycler_unmapped_illumina_pc'] = dict[key]['unicycler']['unmapped_illumina_pc']
+              final_dict[key]['unicycler_busco'] = dict[key]['unicycler']['busco']
+            else:
+              final_dict[key]['unicycler_total_length'] = 0
+              final_dict[key]['unicycler_num_contigs'] = 0
+              final_dict[key]['unicycler_circ_contigs'] = 0
+              final_dict[key]['unicycler_coverage'] = 0
+              final_dict[key]['unicycler_unmapped_nanopore'] = 0
+              final_dict[key]['unicycler_unmapped_nanopore_pc'] = 0
+              final_dict[key]['unicycler_unmapped_illumina'] = 0
+              final_dict[key]['unicycler_unmapped_illumina_pc'] = 0
+              final_dict[key]['unicycler_busco'] = 'NF'
+
+          w = csv.DictWriter(tsv, final_dict[key].keys(), delimiter='\\t')
+          if i < 1 :
+            w.writeheader()
+            i = i+1
+          w.writerow(final_dict[key])
 
   def main():
-    if exists('nanoplot_summary.csv') :
-      nanoplot_dict = file_to_dict('nanoplot_summary.csv', 'sample', ',')
-    else:
-      nanoplot_dict = {}
-
-    if exists('mash_summary.tsv') :
-      mash_dict = mash_file('mash_summary.tsv')
-    else:
-      mash_dict = {}
-
-    if exists('pypolca_summary.tsv') :
-      pypolca_dict  = file_to_dict('pypolca_summary.tsv', 'sample', '\\t')
-    else:
-      pypolca_dict = {}
-
-    if exists('gfastats_summary.csv') :
-      gfastats_dict = file_to_dict_uniq('gfastats_summary.csv', 'sample', 'Header', ',')
-    else:
-      gfastats_dict = {}
-
-    fastp_dict = fastp_results()
-
-    busco_dict = busco_results()
-
-    circulocov_dict = circulocov_results()
-      
-    final_results = {}
-    assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
-    for key in nanoplot_dict.keys():
-      final_results[key] = {}
-      final_results[key]['name'] = key
-
-      # from nanostas
-      final_results[key]['number_of_reads']  = nanoplot_dict[key]['number_of_reads']
-      final_results[key]['mean_read_length'] = nanoplot_dict[key]['mean_read_length']
-      final_results[key]['mean_qual']        = nanoplot_dict[key]['mean_qual']
-
-      # from fastp
-      if key in fastp_dict.keys():
-        final_results[key]['total_illumina_reads'] = fastp_dict[key]
+      if exists('nanoplot_summary.csv') :
+        nanoplot_dict = file_to_dict('nanoplot_summary.csv', 'sample', ',')
       else:
-        final_results[key]['total_illumina_reads'] = 0
+        nanoplot_dict = {}
 
-      # from mash
-      if key in mash_dict.keys():
-        final_results[key]['nanopore_illumina_mash_distance'] = mash_dict[key]['dist']
+      if exists('mash_summary.tsv') :
+        mash_dict = mash_file('mash_summary.tsv')
       else:
-        final_results[key]['nanopore_illumina_mash_distance'] = "NF"
+        mash_dict = {}
 
-      final_results[key]["assembler"] = "${params.assembler}"
+      if exists('pypolca_summary.tsv') :
+        pypolca_dict  = file_to_dict('pypolca_summary.tsv', 'sample', '\t')
+      else:
+        pypolca_dict = {}
 
-      # for each assembler
-      for assembler in assemblers:
-        final_results[key][assembler] = {}
-        if key + "_" + assembler in gfastats_dict.keys():
-          final_results[key]["assembler"] = assembler    
+      if exists('gfastats_summary.csv') :
+        gfastats_dict = file_to_dict_uniq('gfastats_summary.csv', 'sample', 'Header', ',')
+      else:
+        gfastats_dict = {}
 
-          # gfastats results
-          total_length = 0
-          num_circular = 0
-          for contig in gfastats_dict[key + "_" + assembler].keys():
-            total_length = total_length + int(gfastats_dict[key + "_" + assembler][contig]["Total segment length"])
-            if gfastats_dict[key + "_" + assembler][contig]["circular"] == "Y":
-              num_circular = num_circular + 1
-            
-          final_results[key][assembler]['total_length'] = total_length
-          final_results[key][assembler]['num_contigs']  = len(gfastats_dict[key + "_" + assembler].keys())
-          final_results[key][assembler]['circ_contigs'] = num_circular       
-                    
-          # circulocov results
-          if key + "_" + assembler in circulocov_dict.keys():
-            if 'coverage' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler]['coverage']          = circulocov_dict[key + '_' + assembler]['coverage']
-            else:
-              final_results[key][assembler]['coverage']          = "NF"
+      fastp_dict = fastp_results()
 
-            if 'unmapped_nanopore' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler]['unmapped_nanopore']    = circulocov_dict[key + '_' + assembler]['unmapped_nanopore']
-              final_results[key][assembler]['unmapped_nanopore_pc'] = "{:.2f}".format(final_results[key][assembler]['unmapped_nanopore'] / nanoplot_dict[key]['number_of_reads'] * 100)
-            else:
-              final_results[key][assembler]['unmapped_nanopore']    = "NF"
-              final_results[key][assembler]['unmapped_nanopore_pc'] = "NF"
-              
-            if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
-              final_results[key][assembler]['unmapped_illumina'] = circulocov_dict[key + '_' + assembler]['unmapped_illumina']
-              if 'total_illumina_reads' in final_results[key].keys() and final_results[key]['total_illumina_reads'] > 0:
-                final_results[key][assembler]['unmapped_illumina_pc'] = "{:.2f}".format(final_results[key][assembler]['unmapped_illumina'] / final_results[key]['total_illumina_reads'] * 100 )
+      busco_dict = busco_results()
+
+      circulocov_dict = circulocov_results()
+
+      final_results = {}
+      assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
+      for key in nanoplot_dict.keys():
+        final_results[key] = {}
+        final_results[key]['name'] = key
+
+        # from nanostas
+        final_results[key]['number_of_reads']  = nanoplot_dict[key]['number_of_reads']
+        final_results[key]['mean_read_length'] = nanoplot_dict[key]['mean_read_length']
+        final_results[key]['mean_qual']        = nanoplot_dict[key]['mean_qual']
+
+        # from fastp
+        if key in fastp_dict.keys():
+          final_results[key]['total_illumina_reads'] = fastp_dict[key]
+        else:
+          final_results[key]['total_illumina_reads'] = 0
+
+        # from mash
+        if key in mash_dict.keys():
+          final_results[key]['nanopore_illumina_mash_distance'] = mash_dict[key]['dist']
+        else:
+          final_results[key]['nanopore_illumina_mash_distance'] = 'NF'
+
+        final_results[key]['assemblers'] = '${params.assembler}'
+
+        # for each assembler
+        for assembler in assemblers:
+          if key + '_' + assembler in gfastats_dict.keys():
+            final_results[key][assembler] = {}
+            final_results[key][assembler]['assembler'] = assembler
+
+            # gfastats results
+            total_length = 0
+            num_circular = 0
+            for contig in gfastats_dict[key + '_' + assembler].keys():
+              total_length = total_length + int(gfastats_dict[key + '_' + assembler][contig]['Total segment length'])
+              if gfastats_dict[key + '_' + assembler][contig]['circular'] == 'Y':
+                num_circular = num_circular + 1
+
+            final_results[key][assembler]['total_length'] = total_length
+            final_results[key][assembler]['num_contigs']  = len(gfastats_dict[key + '_' + assembler].keys())
+            final_results[key][assembler]['circ_contigs'] = num_circular
+
+            # circulocov results
+            if key + '_' + assembler in circulocov_dict.keys():
+              if 'coverage' in circulocov_dict[key + '_' + assembler].keys():
+                final_results[key][assembler]['coverage']          = circulocov_dict[key + '_' + assembler]['coverage']
               else:
-                final_results[key][assembler]['unmapped_illumina_pc'] = 0.0
-            else:
-              final_results[key][assembler]['unmapped_illumina'] = "NF"
-              final_results[key][assembler]['unmapped_illumina_pc'] = "NF"     
+                final_results[key][assembler]['coverage']          = 'NF'
 
-          # busco results
-          if key + "_" + assembler in busco_dict.keys():
-            final_results[key][assembler]['busco'] = busco_dict[key + "_" + assembler]
-          elif key + "_" + assembler]['reoriented' in busco_dict.keys():                
-            final_results[key][assembler]['busco'] = busco_dict[key + "_" + assembler]['reoriented']
-          else:
-            final_results[key][assembler]['busco'] = "NF"
-
-          if assembler != 'unicycler':
-            for step in ['polypolish', 'pypolca', 'medaka']:
-              if key + "_" + assembler]['' + step in busco_dict.keys():                
-                final_results[key][assembler]['busco_' + step ] = busco_dict[key + "_" + assembler]['' + step]
+              if 'unmapped_nanopore' in circulocov_dict[key + '_' + assembler].keys():
+                final_results[key][assembler]['unmapped_nanopore']    = circulocov_dict[key + '_' + assembler]['unmapped_nanopore']
+                final_results[key][assembler]['unmapped_nanopore_pc'] = '{:.2f}'.format(int(final_results[key][assembler]['unmapped_nanopore']) / int(nanoplot_dict[key]['number_of_reads']) * 100)
               else:
-                final_results[key][assembler]['busco_' + step ] = 'NF'
+                final_results[key][assembler]['unmapped_nanopore']    = 'NF'
+                final_results[key][assembler]['unmapped_nanopore_pc'] = 'NF'
 
-          # pypolca results
-          if key + "_" + assembler in pypolca_dict.keys():
-            if 'Consensus_Quality_Before_Polishing' in pypolca_dict[key + "_" + assembler].keys():
-              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = pypolca_dict[key + "_" + assembler]['Consensus_Quality_Before_Polishing']
+              if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
+                final_results[key][assembler]['unmapped_illumina'] = circulocov_dict[key + '_' + assembler]['unmapped_illumina']
+                if 'total_illumina_reads' in final_results[key].keys() and final_results[key]['total_illumina_reads'] > 0:
+                  final_results[key][assembler]['unmapped_illumina_pc'] = '{:.2f}'.format(int(final_results[key][assembler]['unmapped_illumina']) / int(final_results[key]['total_illumina_reads']) * 100 )
+                else:
+                  final_results[key][assembler]['unmapped_illumina_pc'] = 0.0
+              else:
+                final_results[key][assembler]['unmapped_illumina'] = 'NF'
+                final_results[key][assembler]['unmapped_illumina_pc'] = 'NF'
+
+            # busco results
+            if key + '_' + assembler in busco_dict.keys():
+              final_results[key][assembler]['busco'] = busco_dict[key + '_' + assembler]
+            elif key + '_' + assembler + '_reoriented' in busco_dict.keys():
+              final_results[key][assembler]['busco'] = busco_dict[key + '_' + assembler + '_reoriented']
             else:
-              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = "NF"
-            if 'Consensus_QV_Before_Polishing' in pypolca_dict[key + "_" + assembler].keys():
-              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = pypolca_dict[key + "_" + assembler]['Consensus_QV_Before_Polishing']
-            else:
-              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = "NF"
+              final_results[key][assembler]['busco'] = 'NF'
 
-          elif assembler != 'unicycler':
-            final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0
-            final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0
+            if assembler != 'unicycler':
+              for step in ['polypolish', 'pypolca', 'medaka']:
+                if key + '_' + assembler + '_' + step in busco_dict.keys():
+                  final_results[key][assembler]['busco_' + step ] = busco_dict[key + '_' + assembler + '_' + step]
+                else:
+                  final_results[key][assembler]['busco_' + step ] = 'NF'
 
-    final_file(final_results)
-#    tsv_file(final_results)
+            # pypolca results
+            if key + '_' + assembler in pypolca_dict.keys():
+              if 'Consensus_Quality_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
+                final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = pypolca_dict[key + '_' + assembler]['Consensus_Quality_Before_Polishing']
+              else:
+                final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 'NF'
+              if 'Consensus_QV_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
+                final_results[key][assembler]['Consensus_QV_Before_Polishing']      = pypolca_dict[key + '_' + assembler]['Consensus_QV_Before_Polishing']
+              else:
+                final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 'NF'
 
-  if __name__ == "__main__":
-      main()
+            elif assembler != 'unicycler':
+              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0
+              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0
+
+      final_file(final_results)
+      tsv_file(final_results)
+
+  if __name__ == '__main__':
+    main()
+
 
   """
 }
 
 process unicycler {
   tag           "${meta.id}"
-  label         "process_high"
+  label         'process_high'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/unicycler:0.5.0'
   time          '10h'
@@ -1463,10 +1575,10 @@ process unicycler {
   tuple val(meta), file(illumina), file(nanopore)
 
   output:
-  tuple val(meta), file("unicycler/*_unicycler.fasta"), emit: fasta, optional: true
-  tuple val(meta), file("unicycler/*_unicycler.gfa"), emit: gfa, optional: true
-  path "unicycler/*", emit: everything
-  path "versions.yml", emit: versions
+  tuple val(meta), file('unicycler/*_unicycler.fasta'), emit: fasta, optional: true
+  tuple val(meta), file('unicycler/*_unicycler.gfa'), emit: gfa, optional: true
+  path 'unicycler/*', emit: everything
+  path 'versions.yml', emit: versions
   
   when:
   task.ext.when == null || task.ext.when
