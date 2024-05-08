@@ -27,6 +27,7 @@ We made a [wiki](https://github.com/UPHL-BioNGS/Donut_Falls/wiki), please read i
   - [Examples](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Usage#examples)
   - [Using as a subworkflow](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Linking)
 - [Workflow DAG](https://github.com/UPHL-BioNGS/Donut_Falls/wiki#basic-diagram-of-the-workflow-and-subworkflows)
+- [Assessing Assembly Quality](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/evaluation)
 - [FAQ](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/FAQ)
 
 ## Getting started
