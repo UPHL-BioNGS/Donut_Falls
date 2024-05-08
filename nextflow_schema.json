@@ -52,7 +52,7 @@
                 "config_file": {
                     "type": "boolean",
                     "description" : "Specifies if a config file is copied for the end user. Ends script.",
-                    "hidden" : true
+                    "hidden" : true,
                     "default" : false
                 },
                 "test":{
