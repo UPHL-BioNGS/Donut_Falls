@@ -1233,7 +1233,7 @@ process summary {
   label         "process_single"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
-  time          '10m'
+  time          '30m'
   
   input:
   file(input)
@@ -1338,90 +1338,33 @@ process summary {
         sorted_keys = sorted(dict.keys())
         for key in sorted_keys:
           final_dict[key] = {}
-          final_dict[key]['name'] = dict[key]['name']
-          final_dict[key]['number_of_reads'] = dict[key]['number_of_reads']
-          final_dict[key]['mean_read_length'] = dict[key]['mean_read_length']
-          final_dict[key]['mean_qual'] = dict[key]['mean_qual']
-          final_dict[key]['total_illumina_reads'] = dict[key]['total_illumina_reads']
-          final_dict[key]['nanopore_illumina_mash_distance'] = dict[key]['nanopore_illumina_mash_distance']
-          final_dict[key]['assemblers'] = dict[key]['assemblers']
+          for result_key in ['name', 'number_of_reads', 'mean_read_length', 'mean_qual', 'total_illumina_reads', 'nanopore_illumina_mash_distance', 'assemblers']:
+            final_dict[key][result_key] = dict[key][result_key]
           
-          if 'flye' in dict[key]['assemblers'].replace('dragonflye','dragon'):
-            if 'flye' in dict[key].keys():
-              final_dict[key]['flye_total_length'] = dict[key]['flye']['total_length']
-              final_dict[key]['flye_num_contigs'] = dict[key]['flye']['num_contigs']
-              final_dict[key]['flye_circ_contigs'] = dict[key]['flye']['circ_contigs']
-              final_dict[key]['flye_coverage'] = dict[key]['flye']['coverage']
-              final_dict[key]['flye_unmapped_nanopore'] = dict[key]['flye']['unmapped_nanopore']
-              final_dict[key]['flye_unmapped_nanopore_pc'] = dict[key]['flye']['unmapped_nanopore_pc']
-              final_dict[key]['flye_unmapped_illumina'] = dict[key]['flye']['unmapped_illumina']
-              final_dict[key]['flye_unmapped_illumina_pc'] = dict[key]['flye']['unmapped_illumina_pc']
-              final_dict[key]['flye_busco'] = dict[key]['flye']['busco']
-              final_dict[key]['flye_busco_polished'] = dict[key]['flye']['busco_pypolca']
-              final_dict[key]['flye_quality_before_polishing'] = dict[key]['flye']['Consensus_Quality_Before_Polishing']
-              final_dict[key]['flye_QV_before_polishing'] = dict[key]['flye']['Consensus_QV_Before_Polishing']
-            else:
-              final_dict[key]['flye_total_length'] = 0
-              final_dict[key]['flye_num_contigs'] = 0
-              final_dict[key]['flye_circ_contigs'] = 0
-              final_dict[key]['flye_coverage'] = 0
-              final_dict[key]['flye_unmapped_nanopore'] = 0
-              final_dict[key]['flye_unmapped_nanopore_pc'] = 0
-              final_dict[key]['flye_unmapped_illumina'] = 0
-              final_dict[key]['flye_unmapped_illumina_pc'] = 0
-              final_dict[key]['flye_busco'] = 'NF'
-              final_dict[key]['flye_busco_polished'] = 'NF'
-              final_dict[key]['flye_quality_before_polishing'] = 0
-              final_dict[key]['flye_QV_before_polishing'] = 0            
+          results = ['total_length', 'num_contigs', 'circ_contigs', 'coverage', 'unmapped_nanopore', 'unmapped_nanopore_pc', 'unmapped_illumina', 'unmapped_illumina_pc']
 
-          if 'raven' in dict[key]['assemblers']:
-            if 'raven' in dict[key].keys():
-              final_dict[key]['raven_total_length'] = dict[key]['raven']['total_length']
-              final_dict[key]['raven_num_contigs'] = dict[key]['raven']['num_contigs']
-              final_dict[key]['raven_circ_contigs'] = dict[key]['raven']['circ_contigs']
-              final_dict[key]['raven_coverage'] = dict[key]['raven']['coverage']
-              final_dict[key]['raven_unmapped_nanopore'] = dict[key]['raven']['unmapped_nanopore']
-              final_dict[key]['raven_unmapped_nanopore_pc'] = dict[key]['raven']['unmapped_nanopore_pc']
-              final_dict[key]['raven_unmapped_illumina'] = dict[key]['raven']['unmapped_illumina']
-              final_dict[key]['raven_unmapped_illumina_pc'] = dict[key]['raven']['unmapped_illumina_pc']
-              final_dict[key]['raven_busco'] = dict[key]['raven']['busco']
-              final_dict[key]['raven_busco_polished'] = dict[key]['raven']['busco_pypolca']
-              final_dict[key]['raven_quality_before_polishing'] = dict[key]['raven']['Consensus_Quality_Before_Polishing']
-              final_dict[key]['raven_QV_before_polishing'] = dict[key]['raven']['Consensus_QV_Before_Polishing']
-            else:
-              final_dict[key]['raven_total_length'] = 0
-              final_dict[key]['raven_num_contigs'] = 0
-              final_dict[key]['raven_circ_contigs'] = 0
-              final_dict[key]['raven_coverage'] = 0
-              final_dict[key]['raven_unmapped_nanopore'] = 0
-              final_dict[key]['raven_unmapped_nanopore_pc'] = 0
-              final_dict[key]['raven_unmapped_illumina'] = 0
-              final_dict[key]['raven_unmapped_illumina_pc'] = 0
-              final_dict[key]['raven_busco'] = 'NF'
-              final_dict[key]['raven_busco_polished'] = 'NF'
-              final_dict[key]['raven_quality_before_polishing'] = 0
-              final_dict[key]['raven_QV_before_polishing'] = 0            
+          for assembler in ['flye', 'raven']:
+            if assembler in dict[key]['assemblers'].replace('dragonflye','dragon'):
+              if assembler in dict[key].keys():
+                for result in results + ['busco']:
+                  final_dict[key][assembler + '_' + result] = dict[key][assembler][result]
+                final_dict[key][assembler + '_busco_polished'] = dict[key][assembler]['busco_pypolca']
+                final_dict[key][assembler + '_quality_before_polishing'] = dict[key][assembler]['Consensus_Quality_Before_Polishing']
+                final_dict[key][assembler + '_QV_before_polishing'] = dict[key][assembler]['Consensus_QV_Before_Polishing']
+              else:
+                for result in results + ['quality_before_polishing', 'QV_before_polishing' ]:
+                  final_dict[key][assembler + '_' + result] = 0
+
+                for result in ['busco', 'busco_polished']:
+                  final_dict[key][assembler + '_' + result] = 'NF'
 
           if 'unicycler' in dict[key]['assemblers']:
             if 'unicycler' in dict[key].keys():
-              final_dict[key]['unicycler_total_length'] = dict[key]['unicycler']['total_length']
-              final_dict[key]['unicycler_num_contigs'] = dict[key]['unicycler']['num_contigs']
-              final_dict[key]['unicycler_circ_contigs'] = dict[key]['unicycler']['circ_contigs']
-              final_dict[key]['unicycler_coverage'] = dict[key]['unicycler']['coverage']
-              final_dict[key]['unicycler_unmapped_nanopore'] = dict[key]['unicycler']['unmapped_nanopore']
-              final_dict[key]['unicycler_unmapped_nanopore_pc'] = dict[key]['unicycler']['unmapped_nanopore_pc']
-              final_dict[key]['unicycler_unmapped_illumina'] = dict[key]['unicycler']['unmapped_illumina']
-              final_dict[key]['unicycler_unmapped_illumina_pc'] = dict[key]['unicycler']['unmapped_illumina_pc']
-              final_dict[key]['unicycler_busco'] = dict[key]['unicycler']['busco']
+              for result in results + [ 'busco']:
+                final_dict[key]['unicycler_' + result] = dict[key]['unicycler'][result]
             else:
-              final_dict[key]['unicycler_total_length'] = 0
-              final_dict[key]['unicycler_num_contigs'] = 0
-              final_dict[key]['unicycler_circ_contigs'] = 0
-              final_dict[key]['unicycler_coverage'] = 0
-              final_dict[key]['unicycler_unmapped_nanopore'] = 0
-              final_dict[key]['unicycler_unmapped_nanopore_pc'] = 0
-              final_dict[key]['unicycler_unmapped_illumina'] = 0
-              final_dict[key]['unicycler_unmapped_illumina_pc'] = 0
+              for result in results:
+                final_dict[key]['unicycler_' + result] = 0
               final_dict[key]['unicycler_busco'] = 'NF'
 
           w = csv.DictWriter(tsv, final_dict[key].keys(), delimiter='\\t')
@@ -1464,19 +1407,19 @@ process summary {
         final_results[key]['name'] = key
 
         # from nanostas
-        final_results[key]['number_of_reads']  = nanoplot_dict[key]['number_of_reads']
-        final_results[key]['mean_read_length'] = nanoplot_dict[key]['mean_read_length']
-        final_results[key]['mean_qual']        = nanoplot_dict[key]['mean_qual']
+        final_results[key]['number_of_reads']  = int(nanoplot_dict[key]['number_of_reads'])
+        final_results[key]['mean_read_length'] = float(nanoplot_dict[key]['mean_read_length'])
+        final_results[key]['mean_qual']        = float(nanoplot_dict[key]['mean_qual'])
 
         # from fastp
         if key in fastp_dict.keys():
-          final_results[key]['total_illumina_reads'] = fastp_dict[key]
+          final_results[key]['total_illumina_reads'] = int(fastp_dict[key])
         else:
           final_results[key]['total_illumina_reads'] = 0
 
         # from mash
         if key in mash_dict.keys():
-          final_results[key]['nanopore_illumina_mash_distance'] = mash_dict[key]['dist']
+          final_results[key]['nanopore_illumina_mash_distance'] = float(mash_dict[key]['dist'])
         else:
           final_results[key]['nanopore_illumina_mash_distance'] = 'NF'
 
@@ -1503,21 +1446,21 @@ process summary {
             # circulocov results
             if key + '_' + assembler in circulocov_dict.keys():
               if 'coverage' in circulocov_dict[key + '_' + assembler].keys():
-                final_results[key][assembler]['coverage']          = circulocov_dict[key + '_' + assembler]['coverage']
+                final_results[key][assembler]['coverage']          = float(circulocov_dict[key + '_' + assembler]['coverage'])
               else:
                 final_results[key][assembler]['coverage']          = 'NF'
 
               if 'unmapped_nanopore' in circulocov_dict[key + '_' + assembler].keys():
-                final_results[key][assembler]['unmapped_nanopore']    = circulocov_dict[key + '_' + assembler]['unmapped_nanopore']
-                final_results[key][assembler]['unmapped_nanopore_pc'] = '{:.2f}'.format(int(final_results[key][assembler]['unmapped_nanopore']) / int(nanoplot_dict[key]['number_of_reads']) * 100)
+                final_results[key][assembler]['unmapped_nanopore']    = int(circulocov_dict[key + '_' + assembler]['unmapped_nanopore'])
+                final_results[key][assembler]['unmapped_nanopore_pc'] = float('{:.2f}'.format(int(final_results[key][assembler]['unmapped_nanopore']) / int(nanoplot_dict[key]['number_of_reads']) * 100))
               else:
                 final_results[key][assembler]['unmapped_nanopore']    = 'NF'
                 final_results[key][assembler]['unmapped_nanopore_pc'] = 'NF'
 
               if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
-                final_results[key][assembler]['unmapped_illumina'] = circulocov_dict[key + '_' + assembler]['unmapped_illumina']
+                final_results[key][assembler]['unmapped_illumina'] = int(circulocov_dict[key + '_' + assembler]['unmapped_illumina'])
                 if 'total_illumina_reads' in final_results[key].keys() and final_results[key]['total_illumina_reads'] > 0:
-                  final_results[key][assembler]['unmapped_illumina_pc'] = '{:.2f}'.format(int(final_results[key][assembler]['unmapped_illumina']) / int(final_results[key]['total_illumina_reads']) * 100 )
+                  final_results[key][assembler]['unmapped_illumina_pc'] = float('{:.2f}'.format(int(final_results[key][assembler]['unmapped_illumina']) / int(final_results[key]['total_illumina_reads']) * 100 ))
                 else:
                   final_results[key][assembler]['unmapped_illumina_pc'] = 0.0
               else:
@@ -1542,17 +1485,17 @@ process summary {
             # pypolca results
             if key + '_' + assembler in pypolca_dict.keys():
               if 'Consensus_Quality_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
-                final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = pypolca_dict[key + '_' + assembler]['Consensus_Quality_Before_Polishing']
+                final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = float(pypolca_dict[key + '_' + assembler]['Consensus_Quality_Before_Polishing'])
               else:
                 final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 'NF'
               if 'Consensus_QV_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
-                final_results[key][assembler]['Consensus_QV_Before_Polishing']      = pypolca_dict[key + '_' + assembler]['Consensus_QV_Before_Polishing']
+                final_results[key][assembler]['Consensus_QV_Before_Polishing']      = float(pypolca_dict[key + '_' + assembler]['Consensus_QV_Before_Polishing'])
               else:
                 final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 'NF'
 
             elif assembler != 'unicycler':
-              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0
-              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0
+              final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0.0
+              final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0.0
 
       final_file(final_results)
       tsv_file(final_results)
