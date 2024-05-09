@@ -22,7 +22,7 @@ uphl_sample_sheet.sh \\
 """
 
 combined="combined"
-wgs="/Volumes/IDGenomics_NAS/WGS_Serotyping"
+wgs="/Volumes/IDGenomics_NAS/pulsenet_and_arln"
 sample_key="samples.csv"
 pass="fastq_pass"
 
@@ -107,8 +107,28 @@ do
     R2=$(find $wgs/$ilrun -name "$labid*R2*fastq.gz" -o -name "$altid*R2*fastq.gz" | head -n 1 )
     if [ -z "$R1" ]
     then
-        R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/ -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-        R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/ -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+      echo "Not found in $wgs/$ilrun"
+      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun"
+      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
+      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+    fi
+    if [ -z "$R1" ]
+    then
+      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun"
+      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
+      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+    fi
+    if [ -z "$R1" ]
+    then
+      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun"
+      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
+      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+    fi
+    if [ -z "$R1" ]
+    then
+      echo "Could not find Illumina reads!"
+      R1=""
+      R2=""
     fi
     echo "$labid,$combined/$labid.fastq.gz,$R1,$R2" >> sample_sheet.csv
     echo "$(date): Information for $labid:"
@@ -118,6 +138,6 @@ do
 done <  $sample_key
 
 echo "$(date): Everything is ready for Donut Falls!"
-echo "$(date): Run with \"nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_sheet.csv\""
+echo "$(date): Run with \"nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --assembler flye,unicycler --sample_sheet sample_sheet.csv\""
 
 exit 0
