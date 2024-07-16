@@ -91,7 +91,6 @@ if (params.sequencing_summary){
 // fastq_1 = illumina fastq file
 // fastq_2 = illumina fastq file
 
-
 if (params.sample_sheet) {
   Channel
     .fromPath("${params.sample_sheet}", type: "file")
@@ -499,7 +498,7 @@ process flye {
   tag           "${meta.id}"
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/flye:2.9.3'
+  container     'staphb/flye:2.9.4'
   time          '10h'
 
   input:
@@ -546,7 +545,7 @@ process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/gfastats:1.3.6'
+  container     'staphb/gfastats:1.3.7'
   time          '10m'
 
   input:
@@ -575,7 +574,7 @@ process gfastats {
     --seq-report \
     > gfastats/${prefix}_gfastats.txt
 
-  head -n 1 gfastats/${prefix}_gfastats.txt | tr "\\t" "," | awk '{print "sample," \$0 "circular" }' > gfastats/${prefix}_gfastats_summary.csv
+  head -n 1 gfastats/${prefix}_gfastats.txt | tr "\\t" "," | awk '{print "sample," \$0 }' > gfastats/${prefix}_gfastats_summary.csv
   tail -n+2 gfastats/${prefix}_gfastats.txt | tr "\\t" "," | awk -v sample=${prefix} '{print sample "," \$0 }' >> gfastats/${prefix}_gfastats_summary.csv
   
   cat <<-END_VERSIONS > versions.yml
@@ -616,7 +615,7 @@ process gfa_to_fasta {
                   header = parts[1]
                   seq = parts[2]
                   if header in summary_dict.keys():
-                      new_header = ">" + header + " length=" + summary_dict[header]['Total segment length'] + " circular=" + summary_dict[header]["circular"].replace("N","false").replace("Y","true") + " gc_per=" + summary_dict[header]["GC content %"] + "\\n"
+                      new_header = ">" + header + " length=" + summary_dict[header]['Total segment length'] + " circular=" + summary_dict[header]["Is circular"].replace("N","false").replace("Y","true") + " gc_per=" + summary_dict[header]["GC content %"] + "\\n"
                       with open(outfile, mode='a') as output_file:
                           output_file.write(new_header)
                           output_file.write(seq + "\\n")
@@ -629,7 +628,7 @@ process gfa_to_fasta {
               key = row['Header']
               summary_dict[key] = row
               with open("noncircular.txt", mode='a') as output_file:
-                  if summary_dict[key]["circular"] == "N":
+                  if summary_dict[key]["Is circular"] == "N":
                       output_file.write(key + "\\n")
       return summary_dict
 
@@ -662,8 +661,8 @@ process mash {
 
   shell:
   def args     = task.ext.args     ?: ''
-  def ont_args = task.ext.ont_args ?: '-m 2 -c 20'
-  def ill_args = task.ext.ill_args ?: '-m 2 -c 20'
+  def ont_args = task.ext.ont_args ?: '-m 2'
+  def ill_args = task.ext.ill_args ?: '-m 2'
   def short_re = "${illumina.join(' ')}"
   def prefix   = task.ext.prefix   ?: "${meta.id}"
   """
@@ -679,10 +678,11 @@ process mash {
   mash dist ${args} \
       -p ${task.cpus} \
       ${prefix}.illumina.msh \
-      ${prefix}.nanopore.msh \
+      ${prefix}.nanopore.msh | \
+      awk -v prefix=${prefix} '{print prefix "\\t" \$0 }' \
       > mash/${prefix}.mashdist.txt
 
-  dist=\$(head -n 1 mash/${prefix}.mashdist.txt | awk '{print \$3}')
+  dist=\$(head -n 1 mash/${prefix}.mashdist.txt | awk '{print \$4}')
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -817,9 +817,9 @@ process multiqc {
     echo "#     # soft-masked bases:" >> gfastats_mqc.csv
     echo "#         title: '# soft-masked bases'" >> gfastats_mqc.csv
     echo "#         description: '# soft-masked bases'" >> gfastats_mqc.csv
-    echo "#     circular:" >> gfastats_mqc.csv
-    echo "#         title: 'circular'" >> gfastats_mqc.csv
-    echo "#         description: 'circular'" >> gfastats_mqc.csv
+    echo "#     Is circular:" >> gfastats_mqc.csv
+    echo "#         title: 'Is circular'" >> gfastats_mqc.csv
+    echo "#         description: 'Is circular'" >> gfastats_mqc.csv
     cat gfastats_summary.csv | awk '{print NR ',' \$0}' >> gfastats_mqc.csv
   fi
 
@@ -994,7 +994,7 @@ process nanoplot {
 
 process png {
   tag           "${meta.id}"
-  label         "process_single"
+  label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
   time          '10m'
@@ -1230,7 +1230,7 @@ process raven {
 
 process summary {
   tag           "Creating summary"
-  label         "process_single"
+  label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
   time          '30m'
@@ -1276,6 +1276,9 @@ process summary {
             parts = line.split()
             if parts[2] == 'all':
               dict[sample_analysis]['coverage'] = parts[7]
+              dict[sample_analysis]['nanopore_numreads'] = parts[5]
+              if len(parts) >= 9:
+                dict[sample_analysis]['illumina_numreads'] = parts[9]
 
             if parts[2] == 'missing':
               if len(parts) > 8:
@@ -1296,6 +1299,7 @@ process summary {
           data = json.load(f)
           total_reads = data['summary']['before_filtering']['total_reads']
           dict[sample] = total_reads
+
       return dict
 
   def file_to_dict(file, header, delim):
@@ -1325,9 +1329,9 @@ process summary {
   def mash_file(file):
       dict = {}
       with open(file, mode = 'r') as file:
-        reader = csv.DictReader(file, delimiter='\\t', fieldnames=['illumina','nanopore', 'dist', 'pvalue', 'hash'])
+        reader = csv.DictReader(file, delimiter='\\t', fieldnames=['sample', 'illumina','nanopore', 'dist', 'pvalue', 'hash'])
         for row in reader:
-          key = row['nanopore'].replace('.fastq.gz', '')
+          key = row['sample']
           dict[key] = row
       return dict
 
@@ -1411,7 +1415,7 @@ process summary {
         final_results[key]['mean_read_length'] = float(nanoplot_dict[key]['mean_read_length'])
         final_results[key]['mean_qual']        = float(nanoplot_dict[key]['mean_qual'])
 
-        # from fastp
+        # from fastp (runs on non-unicycler runs)
         if key in fastp_dict.keys():
           final_results[key]['total_illumina_reads'] = int(fastp_dict[key])
         else:
@@ -1436,7 +1440,7 @@ process summary {
             num_circular = 0
             for contig in gfastats_dict[key + '_' + assembler].keys():
               total_length = total_length + int(gfastats_dict[key + '_' + assembler][contig]['Total segment length'])
-              if gfastats_dict[key + '_' + assembler][contig]['circular'] == 'Y':
+              if gfastats_dict[key + '_' + assembler][contig]['Is circular'] == 'Y':
                 num_circular = num_circular + 1
 
             final_results[key][assembler]['total_length'] = total_length
@@ -1456,6 +1460,9 @@ process summary {
               else:
                 final_results[key][assembler]['unmapped_nanopore']    = 'NF'
                 final_results[key][assembler]['unmapped_nanopore_pc'] = 'NF'
+
+              if final_results[key]['total_illumina_reads'] == 0 and 'illumina_numreads' in circulocov_dict[key + '_' + assembler].keys():
+                final_results[key]['total_illumina_reads'] = int(circulocov_dict[key + '_' + assembler]['illumina_numreads'])
 
               if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
                 final_results[key][assembler]['unmapped_illumina'] = int(circulocov_dict[key + '_' + assembler]['unmapped_illumina'])
@@ -1551,7 +1558,7 @@ process unicycler {
 
 process versions {
   tag           "extracting versions"
-  label         "process_single"
+  label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
   time          '30m'
@@ -1659,7 +1666,7 @@ process versions {
 
 process test {
   tag           "Downloading R10.4 reads"
-  label         "process_single"
+  label         "process_low"
   publishDir    "${params.outdir}/test_files/", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.19'
   time          '1h'
@@ -1714,7 +1721,7 @@ workflow DONUT_FALLS {
 
     ch_illumina_input
       .join(mash.out.dist, by: 0)
-      .filter{it[2] as float < 0.01}
+      .filter{it[2] as float < 0.05}
       .map{it -> tuple(it[0], it[1])}
       .set {ch_dist_filter}
 
