@@ -323,7 +323,8 @@ process copy {
         line = line.strip()
         if line.startswith('>'):
           contig    = str(line.replace('>','').split()[0])
-          circular  = gfa_dict[contig]['circular'].replace('Y','true').replace('N','false')
+          print(gfa_dict[contig])
+          circular  = gfa_dict[contig]['Is circular'].replace('Y','true').replace('N','false')
           length    = gfa_dict[contig]['Total segment length']
           gc_per    = gfa_dict[contig]['GC content %']
           meandepth = circulocov_dict[contig]['nanopore_meandepth']
@@ -1509,7 +1510,6 @@ process summary {
 
   if __name__ == '__main__':
     main()
-
 
   """
 }
