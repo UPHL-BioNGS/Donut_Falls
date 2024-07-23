@@ -323,7 +323,6 @@ process copy {
         line = line.strip()
         if line.startswith('>'):
           contig    = str(line.replace('>','').split()[0])
-          print(gfa_dict[contig])
           circular  = gfa_dict[contig]['Is circular'].replace('Y','true').replace('N','false')
           length    = gfa_dict[contig]['Total segment length']
           gc_per    = gfa_dict[contig]['GC content %']
@@ -1333,7 +1332,6 @@ process summary {
         sorted_keys = sorted(dict.keys())
         for key in sorted_keys:
           final_dict[key] = {}
-          print(dict[key])
           for result_key in ['name', 'number_of_reads', 'mean_read_length', 'mean_qual', 'total_illumina_reads', 'nanopore_illumina_mash_distance', 'assemblers']:
             final_dict[key][result_key] = dict[key][result_key]
           
