@@ -98,9 +98,9 @@ if (params.sample_sheet) {
     .map { it ->
       meta = [id:it.sample] 
       tuple( meta,
-        "${it.fastq}",
+        file("${it.fastq}", checkIfExists: true),
         "${it.fastq_1}",
-        "${it.fastq_2}" )
+        "${it.fastq_2}")
     }
     .set{ ch_input_files }
 } else {
@@ -110,7 +110,7 @@ if (params.sample_sheet) {
 // channel for illumina files (paired-end only)
 ch_input_files
   .filter { it[2] != it[3] }
-  .map { it -> tuple (it[0], [file(it[2], checkIfExists: true), file(it[3], checkIfExists: true)])}
+  .map { it -> tuple(it[0], [file(it[2], checkIfExists: true), file(it[3], checkIfExists: true)])}
   .set { ch_illumina_input }
 
 // channel for nanopore files
@@ -1859,7 +1859,7 @@ workflow DONUT_FALLS {
       ch_consensus = ch_consensus.mix(dnaapler.out.fasta).mix(medaka.out.fasta).mix(polypolish.out.fasta).mix(pypolca.out.fasta)
     }
 
-    nanoplot(ch_nanopore_input.mix(ch_illumina_input))
+    nanoplot(ch_nanopore_input.mix(ch_illumina_input.filter{it[1]}))
 
     nanoplot.out.summary
       .collectFile(name: "nanoplot_summary.csv",
