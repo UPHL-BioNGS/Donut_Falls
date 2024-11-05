@@ -197,7 +197,7 @@ process bwa {
   tag           "${meta.id}"
   label         'process_high'
   // no publishDir because the sam files are too big
-  container     'staphb/bwa:0.7.17'
+  container     'staphb/bwa:0.7.18'
   time          '2h'
 
   input:
@@ -399,7 +399,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:0.7.0'
+  container     'staphb/dnaapler:0.8.1'
   time          '1h'
 
   input:
@@ -498,7 +498,7 @@ process flye {
   tag           "${meta.id}"
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/flye:2.9.4'
+  container     'staphb/flye:2.9.5'
   time          '10h'
 
   input:
@@ -740,7 +740,7 @@ process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.19'
+  container     'staphb/multiqc:1.25'
   time          '10m'
 
   input:
@@ -1160,7 +1160,7 @@ process rasusa {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/rasusa:2.0.0'
+  container     'staphb/rasusa:2.1.0'
   time          '10m'
 
   input:
