@@ -1656,7 +1656,7 @@ process test {
   tag           "Downloading R10.4 reads"
   label         "process_low"
   publishDir    "${params.outdir}/test_files/", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  container     'staphb/gfastats:1.3.7'
   time          '1h'
 
   output:
