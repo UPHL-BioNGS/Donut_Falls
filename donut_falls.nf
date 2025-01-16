@@ -162,7 +162,7 @@ process busco {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/busco:5.8.0-prok-bacteria_odb10_2024-01-08'
+  container     'staphb/busco:5.8.2-prok-bacteria_odb12_2024-11-14'
   time          '45m'
 
   input:
@@ -399,7 +399,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:0.8.1'
+  container     'staphb/dnaapler:1.0.1'
   time          '1h'
 
   input:
@@ -436,7 +436,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:0.23.4'
+  container     'staphb/fastp:0.24.0'
   time          '10m'
 
   input:
@@ -588,7 +588,7 @@ process gfa_to_fasta {
   tag           "${meta.id}"
   label         "process_low"
   // no publishDir
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.26'
   time          '10m'
 
   input:
