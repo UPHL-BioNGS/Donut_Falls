@@ -556,7 +556,7 @@ process flye {
 process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "gfastats/*"
   container     'staphb/gfastats:1.3.7'
   time          '10m'
 
