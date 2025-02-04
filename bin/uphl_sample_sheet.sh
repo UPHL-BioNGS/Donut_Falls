@@ -105,25 +105,18 @@ do
     ilrun=$(echo $line | cut -f 4 -d , )
     R1=$(find $wgs/$ilrun -name "$labid*R1*fastq.gz" -o -name "$altid*R1*fastq.gz" | head -n 1 )
     R2=$(find $wgs/$ilrun -name "$labid*R2*fastq.gz" -o -name "$altid*R2*fastq.gz" | head -n 1 )
-    if [ -z "$R1" ]
-    then
-      echo "Not found in $wgs/$ilrun"
-      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun"
-      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2023/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
-    fi
-    if [ -z "$R1" ]
-    then
-      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun"
-      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2022/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
-    fi
-    if [ -z "$R1" ]
-    then
-      echo "Searching /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun"
-      R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-      R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/2021/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
-    fi
+
+    echo "Not found in ${wgs}/${ilrun}. Looking in /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/"
+    for year in 2025 2024 2023 2022 2021 2020
+    do
+      if [ -z "$R1" ]
+      then
+        echo "Looking in /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}."
+        R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
+        R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+      fi
+    done
+
     if [ -z "$R1" ]
     then
       echo "Could not find Illumina reads!"

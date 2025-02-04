@@ -1,10 +1,10 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
-    "$id": "https://raw.githubusercontent.com/UPHL-BioNGS/Donut_Falls/main/nextflow_schema.json",
-    "title": "Donut Falls Parameters",
-    "description": "Donut Falls is a workflow for assembly from nanopore or nanopore/illumina reads",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/UPHL-BioNGS/Donut_Falls/master/nextflow_schema.json",
+    "title": "UPHL-BioNGS/Donut_Falls pipeline parameters",
+    "description": "De novo assembly of long-reads",
     "type": "object",
-    "definitions":{
+    "$defs": {
         "input_output_options": {
             "title": "Input/output options",
             "type": "object",
@@ -15,50 +15,86 @@
                 "outdir"
             ],
             "properties": {
+                "sequencing_summary": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "input channel for nanopore sequencing summary file (optional)"
+                },
                 "sample_sheet": {
                     "type": "string",
-                    "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)"
+                    "format": "file-path",
+                    "mimetype": "text/csv",
+                    "description": "csv file with sample,nanopore fastq file,illumina R1 (optional),illuimina R2 (optional)",
+                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row."
                 },
-                "outdir": { 
-                    "type": "string", 
-                    "description": "Specifies where results are saved",
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "mimetype": "text/csv",
+                    "description": "sample as sample sheet",
+                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
+                    "fa_icon": "fas fa-file-csv",
+                    "hidden": true
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "fa_icon": "fas fa-folder-open",
                     "default": "donut_falls"
-                },
-                "sequencing_summary": { 
-                    "type": "string", 
-                    "description": "input channel for nanopore sequencing summary file (optional)"
                 }
             }
         },
-        "pipeline_configuration_options": {
-            "title": "Pipeline Configuration options",
+        "runtime_options": {
+            "title": "Runtime options",
             "type": "object",
-            "description": "Options to configure how the workflow runs.",
+            "description": "",
+            "default": "",
             "properties": {
-                "assembler": { 
-                    "type": "string", 
+                "assembler": {
+                    "type": "string",
+                    "default": "flye",
                     "description": "Specifies which assembler is/assemblers are going to be used.",
-                    "default" : "flye"
-                }
-            }
-        },
-        "generic_options": {
-            "title": "Generic options",
-            "type": "object",
-            "fa_icon": "fas fa-file-import",
-            "description": "Less common options for the pipeline, typically set in a config file.",
-            "help_text": "These options are common to all nf-core pipelines and allow you to customize some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
-            "properties": {
+                    "help_text": "Donut Falls allows several assemblers and will run any that are listed. Unicycler, Flye, and Raven are supported (i.e. --assembler flye_raven_unicycler will run all three)."
+                },
+                "test": {
+                    "type": "boolean",
+                    "hidden": true,
+                    "description": "Specifies if test files should be downloaded from zenodo"
+                },
                 "config_file": {
                     "type": "boolean",
-                    "description" : "Specifies if a config file is copied for the end user. Ends script.",
-                    "hidden" : true,
-                    "default" : false
+                    "description": "Copies config file for end user for editing.",
+                    "hidden": true
                 },
-                "test":{
-                    "type": "boolean",
-                    "description": "Downloads test file",
-                    "default": false,
+                "config_profile_name": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "custom_config_version": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "custom_config_base": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Included for linting.",
                     "hidden": true
                 }
             }
@@ -66,13 +102,10 @@
     },
     "allOf": [
         {
-            "$ref": "#/definitions/input_output_options"
+            "$ref": "#/$defs/input_output_options"
         },
         {
-            "$ref": "#/definitions/pipeline_configuration_options"
-        },
-        {
-            "$ref": "#/definitions/generic_options"
+            "$ref": "#/$defs/runtime_options"
         }
     ]
 }

@@ -29,8 +29,6 @@ println('')
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
-
-params.config_file        = false
 if (params.config_file) {
   def src = new File("${workflow.projectDir}/configs/donut_falls_config_template.config")
   def dst = new File("${workflow.launchDir}/edit_me.config")
@@ -38,12 +36,6 @@ if (params.config_file) {
   println("A config file can be found at ${workflow.launchDir}/edit_me.config")
   exit 0
 }
-
-params.sequencing_summary = ''
-params.sample_sheet       = ''
-params.assembler          = 'flye'
-params.outdir             = 'donut_falls'
-params.test               = ''
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
@@ -53,12 +45,19 @@ params.test               = ''
 
 def paramCheck(keys) {
   set_keys = [
+    "input",
     "outdir",
     "sample_sheet",
     "sequencing_summary",
     "assembler",
     "test",
-    "config_file"]
+    "config_file",
+    "custom_config_version",
+    "custom_config_base",
+    "config_profile_name",
+    "config_profile_description",
+    "config_profile_contact",
+    "config_profile_url"]
 
   for(key in keys){
     if (key !in set_keys){
@@ -162,7 +161,7 @@ process busco {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/busco:5.8.0-prok-bacteria_odb10_2024-01-08'
+  container     'staphb/busco:5.8.2-prok-bacteria_odb12_2024-11-14'
   time          '45m'
 
   input:
@@ -399,7 +398,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:0.8.1'
+  container     'staphb/dnaapler:1.0.1'
   time          '1h'
 
   input:
@@ -422,8 +421,7 @@ process dnaapler {
     --prefix ${prefix} \
     --output dnaapler \
     --threads ${task.cpus} \
-    --ignore ${ignore} || \
-    cp ${fasta} dnaapler/${prefix}_reoriented.fasta
+    --ignore ${ignore}
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -436,8 +434,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:0.23.4'
-  time          '10m'
+  container     'staphb/fastp:0.24.0'
 
   input:
   tuple val(meta), file(reads)
@@ -453,45 +450,60 @@ process fastp {
 
   shell:
   def args   = task.ext.args   ?: ''
-  def lrargs = task.ext.lrargs ?: '--qualified_quality_phred 12 --length_required 1000'
   def prefix = task.ext.prefix ?: "${meta.id}"
-  if (reads.toList().size() > 1 ){
-    """
-    mkdir -p fastp
+  """
+  mkdir -p fastp
 
-    fastp ${args} \
-      --in1 ${reads[0]} \
-      --in2 ${reads[1]} \
-      --out1 fastp/${prefix}_fastp_sr_R1.fastq.gz \
-      --out2 fastp/${prefix}_fastp_sr_R2.fastq.gz \
-      -h fastp/${prefix}_fastp_sr.html \
-      -j fastp/${prefix}_fastp_sr.json
+  fastp ${args} \
+    --in1 ${reads[0]} \
+    --in2 ${reads[1]} \
+    --out1 fastp/${prefix}_fastp_R1.fastq.gz \
+    --out2 fastp/${prefix}_fastp_R2.fastq.gz \
+    -h fastp/${prefix}_fastp.html \
+    -j fastp/${prefix}_fastp.json
 
-    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print \$NF}' | head -n 1 )
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    fastp: \$(fastp --version 2>&1 | awk '{print \$NF}' )
+  END_VERSIONS
+  """
+}
 
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-      fastp: \$(fastp --version 2>&1 | awk '{print \$NF}' )
-    END_VERSIONS
-    """
-  } else {
-    """
-    mkdir -p fastp
+process fastplong {
+  tag           "${meta.id}"
+  label         "process_low"
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/fastplong:0.2.2'
 
-    fastp ${lrargs} \
-      --in1 ${reads[0]} \
-      --out1 fastp/${prefix}_fastp_lr.fastq.gz \
-      -h fastp/${prefix}_fastp_lr.html \
-      -j fastp/${prefix}_fastp_lr.json
+  input:
+  tuple val(meta), file(reads)
 
-    passed_filter_reads=\$(grep passed_filter_reads fastp/${prefix}_fastp_sr.json | awk '{print \$NF}' | head -n 1 )
+  output:
+  tuple val(meta), file("fastplong/*_fastp*.fastq.gz"), emit: fastq
+  path "fastplong/*", emit: everything
+  path "fastplong/*_fastp*.json", emit: summary
+  path "versions.yml", emit: versions
+  
+  when:
+  task.ext.when == null || task.ext.when
 
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-      fastp: \$(fastp --version 2>&1 | awk '{print \$NF}')
-    END_VERSIONS
-    """
-  }
+  shell:
+  def args   = task.ext.args   ?: ''
+  def prefix = task.ext.prefix ?: "${meta.id}"
+  """
+  mkdir -p fastplong
+
+  fastplong ${args} \
+    --in ${reads} \
+    --out fastplong/${prefix}_fastplong.fastq.gz \
+    --html fastplong/${prefix}_fastplong.html \
+    --json fastplong/${prefix}_fastplong.json
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    fastplong: \$(fastplong --version 2>&1 | awk '{print \$NF}')
+  END_VERSIONS
+  """
 }
 
 process flye {
@@ -544,7 +556,7 @@ process flye {
 process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "gfastats/*"
   container     'staphb/gfastats:1.3.7'
   time          '10m'
 
@@ -588,7 +600,7 @@ process gfa_to_fasta {
   tag           "${meta.id}"
   label         "process_low"
   // no publishDir
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.26'
   time          '10m'
 
   input:
@@ -698,7 +710,7 @@ process medaka {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'ontresearch/medaka:v1.11.3'
+  container     'staphb/medaka:2.0.1'
   time          '30m'
 
   input:
@@ -1724,27 +1736,16 @@ workflow DONUT_FALLS {
 
     if (params.assembler.replaceAll('dragonflye','dragon') =~ /flye/ || params.assembler =~ /raven/ ) {
       // quality filter
-      ch_dist_filter
-        .map { it -> [it[0], it[1]]}
-        .mix(ch_nanopore_input.map { it -> [it[0], it[1]]})
-        .filter{it[0]}
-        .set { ch_input }
 
-      fastp(ch_input)
-
+      fastp(ch_dist_filter.map { it -> [it[0], it[1]]}.filter{it[0]})
       ch_versions = ch_versions.mix(fastp.out.versions)
       ch_summary  = ch_summary.mix(fastp.out.summary)
 
-      fastp.out.fastq
-        .branch { it ->
-          illumina: it[1].toList().size() == 2
-          nanopore: it[1].size() > 200
-        }
-      .set { ch_filter }
+      fastplong(ch_nanopore_input.map { it -> [it[0], it[1]]})
+      ch_versions = ch_versions.mix(fastplong.out.versions)
+      ch_summary  = ch_summary.mix(fastplong.out.summary)
 
-      ch_filter.nanopore.view{it[1].toList().size()}
-
-      rasusa(ch_filter.nanopore)
+      rasusa(fastplong.out.fastq)
 
       ch_versions = ch_versions.mix(rasusa.out.versions)
 
@@ -1977,6 +1978,6 @@ workflow.onComplete {
   println("Pipeline completed at: $workflow.complete")
   println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
   println("The consensus fasta files can be found in ${params.outdir}/sample/consensus")
-  println("The fasta files are from each phase of assembly. polca > polypolish > medaka > unpolished")
+  println("The fasta files are from each phase of assembly: unpolished -> medaka -> polypolish (if illumina reads are supplied) -> polca")
   println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }
