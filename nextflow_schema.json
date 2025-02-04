@@ -27,6 +27,11 @@
                 "sequencing_summary": { 
                     "type": "string", 
                     "description": "input channel for nanopore sequencing summary file (optional)"
+                },
+                "input": {
+                    "type": "string",
+                    "description": "sample as sample sheet",
+                    "hidden": true
                 }
             }
         },
