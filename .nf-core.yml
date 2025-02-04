@@ -1,1 +1,16 @@
 repository_type: pipeline
+lint:
+  actions_awsfulltest: False
+  files_exist: False
+  template_strings: False
+  multiqc_config: False
+  nextflow_config:
+    - "process.cpus"
+    - "process.memory"
+    - "process.time"
+    - "manifest.name"
+    - "manifest.homePage"
+    - "params.custom_config_version"
+    - "https://raw.githubusercontent.com/nf-core/configs/"
+  base_config: False
+  modules_config: False
