@@ -54,6 +54,7 @@
                 "assembler": {
                     "type": "string",
                     "default": "flye",
+                    "description": "Specifies which assembler is/assemblers are going to be used.",
                     "help_text": "Donut Falls allows several assemblers and will run any that are listed. Unicycler, Flye, and Raven are supported (i.e. --assembler flye_raven_unicycler will run all three)."
                 },
                 "test": {
@@ -64,6 +65,36 @@
                 "config_file": {
                     "type": "boolean",
                     "description": "Copies config file for end user for editing.",
+                    "hidden": true
+                },
+                "config_profile_name": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "custom_config_version": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "custom_config_base": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Included for linting.",
+                    "hidden": true
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Included for linting.",
                     "hidden": true
                 }
             }
