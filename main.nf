@@ -51,7 +51,13 @@ def paramCheck(keys) {
     "sequencing_summary",
     "assembler",
     "test",
-    "config_file"]
+    "config_file",
+    "custom_config_version",
+    "custom_config_base",
+    "config_profile_name",
+    "config_profile_description",
+    "config_profile_contact",
+    "config_profile_url"]
 
   for(key in keys){
     if (key !in set_keys){
@@ -415,7 +421,7 @@ process dnaapler {
     --prefix ${prefix} \
     --output dnaapler \
     --threads ${task.cpus} \
-    --ignore ignore.txt
+    --ignore ${ignore}
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -495,7 +501,7 @@ process fastplong {
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
-    fastp: \$(fastp --version 2>&1 | awk '{print \$NF}')
+    fastplong: \$(fastplong --version 2>&1 | awk '{print \$NF}')
   END_VERSIONS
   """
 }
@@ -1732,11 +1738,12 @@ workflow DONUT_FALLS {
       // quality filter
 
       fastp(ch_dist_filter.map { it -> [it[0], it[1]]}.filter{it[0]})
-
       ch_versions = ch_versions.mix(fastp.out.versions)
       ch_summary  = ch_summary.mix(fastp.out.summary)
 
       fastplong(ch_nanopore_input.map { it -> [it[0], it[1]]})
+      ch_versions = ch_versions.mix(fastplong.out.versions)
+      ch_summary  = ch_summary.mix(fastplong.out.summary)
 
       rasusa(fastplong.out.fastq)
 
@@ -1971,6 +1978,6 @@ workflow.onComplete {
   println("Pipeline completed at: $workflow.complete")
   println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
   println("The consensus fasta files can be found in ${params.outdir}/sample/consensus")
-  println("The fasta files are from each phase of assembly. polca > polypolish > medaka > unpolished")
+  println("The fasta files are from each phase of assembly: unpolished -> medaka -> polypolish (if illumina reads are supplied) -> polca")
   println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }
