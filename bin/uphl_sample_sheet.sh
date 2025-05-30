@@ -22,7 +22,7 @@ uphl_sample_sheet.sh \\
 """
 
 combined="combined"
-wgs="/Volumes/IDGenomics_NAS/pulsenet_and_arln"
+wgs="/Volumes/NGS_2/pulsenet_and_arln"
 sample_key="samples.csv"
 pass="fastq_pass"
 
@@ -106,14 +106,14 @@ do
     R1=$(find $wgs/$ilrun -name "$labid*R1*fastq.gz" -o -name "$altid*R1*fastq.gz" | head -n 1 )
     R2=$(find $wgs/$ilrun -name "$labid*R2*fastq.gz" -o -name "$altid*R2*fastq.gz" | head -n 1 )
 
-    echo "Not found in ${wgs}/${ilrun}. Looking in /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/"
+    echo "Not found in ${wgs}/${ilrun}. Looking in /Volumes/NGS_2/pulsenet_and_arln/old_runs/"
     for year in 2025 2024 2023 2022 2021 2020
     do
       if [ -z "$R1" ]
       then
-        echo "Looking in /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}."
-        R1=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-        R2=$(find /Volumes/IDGenomics_NAS/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+        echo "Looking in /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}."
+        R1=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
+        R2=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
       fi
     done
 
@@ -131,6 +131,6 @@ do
 done <  $sample_key
 
 echo "$(date): Everything is ready for Donut Falls!"
-echo "$(date): Run with \"nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --assembler flye,unicycler --sample_sheet sample_sheet.csv\""
+echo "$(date): Run with \"nextflow run UPHL-BioNGS/Donut_Falls -profile docker--assembler flye,unicycler --sample_sheet sample_sheet.csv\""
 
 exit 0
