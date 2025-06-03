@@ -174,47 +174,57 @@ def seqkit_file(file):
 
 def tsv_file(results_dict):
     final_results_dict = {}
+    
     # converting the final dict to something tsv friendly
+    sorted_keys = list(sorted(results_dict.keys()))
+    all_keys = []
+    for sample in sorted_keys:
+      final_results_dict[sample] = {}
+      if 'nanopore' in results_dict[sample].keys():
+        for result in results_dict[sample]['nanopore'].keys():
+          final_results_dict[sample][f"seqkit_{result}"] = results_dict[sample]['nanopore'][result]
+
+      if 'illumina' in results_dict[sample].keys():
+        for result in results_dict[sample]['illumina'].keys():
+          final_results_dict[sample][f"seqkit_illumina_{result}"] = results_dict[sample]['illumina'][result]
+
+      if 'mash' in results_dict[sample].keys():
+        for result in results_dict[sample]['mash'].keys():
+          final_results_dict[sample][f"mash_{result}"] = results_dict[sample]['mash'][result]
+
+      for analysis in ['pypolca', 'busco']:
+        if analysis in results_dict[sample].keys():
+          for assembler in results_dict[sample][analysis].keys():
+            for result in results_dict[sample][analysis][assembler].keys():
+              final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
+
+      if 'gfastats' in results_dict[sample].keys():
+        for assembler in results_dict[sample]['gfastats'].keys():
+          for result in ['num_contigs', 'total_length', 'circ_contigs']:
+            final_results_dict[sample][f"{assembler}_gfastats_{result}"] = results_dict[sample]['gfastats'][assembler][result]
+
+      if 'circulocov' in results_dict[sample].keys():
+        for assembler in results_dict[sample]['circulocov'].keys():
+          for result in results_dict[sample]['circulocov'][assembler]['all'].keys():
+            final_results_dict[sample][f"{assembler}_circulocov_{result}"] = results_dict[sample]['circulocov'][assembler]['all'][result]
+      
+      all_keys += list(final_results_dict[sample].keys())
+
+    unique_key = list(set(all_keys))
+
     with open('donut_falls_summary.tsv', 'w') as tsv:
       i = 0
-      sorted_keys = list(sorted(results_dict.keys()))
       for sample in sorted_keys:
-        final_results_dict[sample] = {}
-        for result_key in ['sample', 'num_seqs', 'avg_len', 'AvgQual']:
-          final_results_dict[sample][result_key] = results_dict[sample]['nanopore'][result_key] if results_dict[sample]['nanopore'][result_key] else 0
-        
-        final_results_dict[sample]['assemblers'] = results_dict[sample]['assemblers']
-        final_results_dict[sample]['total_illumina_reads'] = results_dict[sample]['illumina']['num_seqs'] if results_dict[sample]['illumina']['num_seqs'] else 0
-        final_results_dict[sample]['nanopore_illumina_mash_distance'] = results_dict[sample]['mash']['dist'] if  results_dict[sample]['mash']['dist'] else 1
+        for key in unique_key:
+          if key not in final_results_dict[sample].keys():
+            final_results_dict[sample][key] = ""
 
-        for assembler in ['flye', 'raven', 'myloasm']:
-          if assembler in results_dict[sample]['assemblers']:
-            if assembler in list(results_dict[sample]['gfastats'].keys()):
-              for result in ['total_length', 'num_contigs', 'circ_contigs']:
-                final_results_dict[sample][f"{assembler}_{result}"] = results_dict[sample]['gfastats'][assembler][result] if results_dict[sample]['gfastats'][assembler][result] else 0
-              for result in ['nanopore_meandepth', 'nanopore_meandepth', 'unmapped_nanopore', 'unmapped_nanopore_pc', 'illumina_meandepth', 'unmapped_illumina', 'unmapped_illumina_pc', 'illumina_meandepth']:
-                final_results_dict[sample][f"{assembler}_{result}"] = results_dict[sample]['circulocov'][assembler]['all'][result] if results_dict[sample]['circulocov'][assembler]['all'][result] else 0
-              print(results_dict[sample]['pypolca'][assembler])
-              final_results_dict[sample][f"{assembler}_busco_polished"] = results_dict[sample]['busco'][assembler]['pypolca']
-              final_results_dict[sample][f"{assembler}_quality_before_polishing"] = results_dict[sample]['pypolca'][assembler]['Consensus_Quality_Before_Polishing']
-              final_results_dict[sample][f"{assembler}_QV_before_polishing"] = results_dict[sample]['pypolca'][assembler]['Consensus_QV_Before_Polishing']
-            else:
-              for result in results + ['quality_before_polishing', 'QV_before_polishing' ]:
-                final_results_dict[sample][assembler + '_' + result] = 0
-              for result in ['busco', 'busco_polished']:
-                final_results_dict[sample][assembler + '_' + result] = 'NF'
-        if 'unicycler' in results_dict[sample]['assemblers']:
-          if 'unicycler' in results_dict[sample].keys():
-            for result in results + [ 'busco']:
-              final_results_dict[sample]['unicycler_' + result] = results_dict[sample]['unicycler'][result]
-          else:
-            for result in results:
-              final_results_dict[sample]['unicycler_' + result] = 0
-            final_results_dict[sample]['unicycler_busco'] = 'NF'
+        final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
+
         w = csv.DictWriter(tsv, final_results_dict[sample].keys(), delimiter='\t')
         if i < 1 :
           w.writeheader()
-          i = i+1
+          i += 1
         w.writerow(final_results_dict[sample])
 
 def main():
