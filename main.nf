@@ -1053,17 +1053,17 @@ process raven {
 }
 
 process seqkit {
-  tag           "stats"
+  tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/seqkit:2.10.0'
   time          '10m'
 
   input:
-  file(fastq)
+  tuple val(meta), file(nanopore), file(illumina)
 
   output:
-  path("seqkit/seqkit_stats.tsv"), emit: stats
+  path("seqkit/*seqkit_stats.tsv"), emit: stats
   path "versions.yml", emit: versions
 
   when:
@@ -1071,7 +1071,8 @@ process seqkit {
 
   shell:
   def args   = task.ext.args   ?: '--all'
-  def prefix = task.ext.prefix ?: ""
+  def prefix = task.ext.prefix ?: "${meta.id}"
+  def ill_rds = (illumina[1] =~ /input/) ? "" : "${illumina.join(' ')}"
   """
   mkdir -p seqkit
 
@@ -1079,8 +1080,11 @@ process seqkit {
     ${args} \
     --tabular \
     --threads ${task.cpus} \
-    ${fastq.join(' ')} > \
-    seqkit/seqkit_stats.tsv
+    ${nanopore} \
+    ${ill_rds} | \
+    awk '{print "${prefix}\t" \$0}' | \
+    sed 's/${prefix}\\tfile/sample\\tfile/g' > \
+    seqkit/${prefix}_seqkit_stats.tsv
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -1598,13 +1602,6 @@ workflow DONUT_FALLS {
     // this is helpful because these should be very close
     mash(ch_illumina_input.join(ch_nanopore_input, by: 0, remainder: false))
 
-    ch_versions = ch_versions.mix(mash.out.versions.first())
-
-    // general qc information
-    seqkit(ch_illumina_input.map{ it -> it[1]}.flatten().filter{it}.mix(ch_nanopore_input.map{it -> it[1]}).collect())
-
-    ch_versions = ch_versions.mix(seqkit.out.versions)
-
     mash.out.txt
       .collectFile(
         storeDir: "${params.outdir}/summary/",
@@ -1614,6 +1611,21 @@ workflow DONUT_FALLS {
       .set { mash_summary }
 
     ch_summary  = ch_summary.mix(mash_summary)
+    ch_versions = ch_versions.mix(mash.out.versions.first())
+
+    // general qc information
+    seqkit(ch_nanopore_input.mix(ch_illumina_input).groupTuple().map{ it -> tuple(it[0], it[1][0], it[1][1])})
+
+    seqkit.out.stats
+      .collectFile(
+        storeDir: "${params.outdir}/summary/",
+        keepHeader: true,
+        sort: { file -> file.text },
+        name: "seqkit_summary.tsv")
+      .set { seqkit_summary }
+
+    ch_summary = ch_summary.mix(seqkit_summary)
+    ch_versions = ch_versions.mix(seqkit.out.versions)
 
     ch_illumina_input
       .join(mash.out.dist, by: 0)
