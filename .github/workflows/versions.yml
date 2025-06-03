@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -20,7 +20,7 @@ jobs:
       - name: versions
         run: |
           issue_text="Needing updates:  "     
-          staphb_containers=($(grep -h container donut_falls.nf | grep staphb | sort | uniq | grep -v latest | awk '{print $2}' | sed 's/'\''//g'))
+          staphb_containers=($(grep -h container main.nf | grep staphb | sort | uniq | grep -v latest | awk '{print $2}' | sed 's/'\''//g'))
           for container in ${staphb_containers[@]}
           do
             echo "Looking at $container"
