@@ -182,7 +182,6 @@ process bcftools {
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
     bcftools: \$(bcftools --version | head -n 1 | awk '{print \$NF}')
-    container: ${task.container}
   END_VERSIONS
   """
 }
@@ -336,8 +335,6 @@ process clair3 {
     --platform=ont \
     --model_path /clair3/models/ont
 
-  rm -rf tmp
-
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
     clair3: \$(run_clair3.sh  --version | awk '{print \$NF}')
@@ -353,7 +350,7 @@ process copy {
   time          '10m'
 
   input:
-  tuple val(meta), file(fasta), file(circulocov), file(gfastats)
+  tuple val(meta), file(fasta), file(gfastats)
 
   output:
   path "consensus/*", emit: fastas
@@ -363,116 +360,53 @@ process copy {
 
   script:
   """
-  #!/usr/bin/env python3
-  import glob
-  import csv
-  import os
+  #!/usr/bin/env python3 
+import glob
+import os
+import shutil
 
-  def gfastats_to_dict(header_dict):
-      result = {}
-      with open('gfastats_summary.csv', mode='r') as file:
-          reader = csv.DictReader(file)
-          for row in reader:
-              if row['sample'] == f"{header_dict['name']}_{header_dict['assembler']}":
-                  key = row['Header']
-                  result[key] = row
-      return result
+def check_circ(file, name):
+      for x in [".fasta", "_reoriented", "_clair3", "_polypolish", "_pypolca"]:
+          name = name.replace(x, "")
 
-  def circulocov_to_dict(header_dict):
-      result = {}
-      with open('circulocov_summary.txt', mode='r', newline='') as file:
-          reader = csv.DictReader(file, delimiter='\\t')
-          for row in reader:
-              if row['sample'].replace('_reoriented','') == f"{header_dict['name']}_{header_dict['assembler']}" :
-                  key = row['contigs']
-                  result[key] = row
-      return result
-
-  def copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict):
-      with open(fasta, 'r') as file:
-          fasta_dict = {}
-
-          circ_check = any(gfa_dict[contig].get('Is circular') == 'N' for contig in gfa_dict)
-
-          for line in file:
+      with open(file, "r") as f:
+          for line in f:
               line = line.strip()
-              if line.startswith('>'):
-                  contig    = str(line.replace('>','').split()[0])
-                  circular  = gfa_dict[contig]['Is circular'].replace('Y','true').replace('N','false')
-                  length    = gfa_dict[contig]['Total segment length']
-                  gc_per    = gfa_dict[contig]['GC content %']
-                  meandepth = circulocov_dict[contig]['nanopore_meandepth']
-                  assembler = header_dict['assembler']
-                  step      = header_dict['step']
-                  
-                  # creating the header
-                  header = f">{contig} circ={circular} len={length} gc={gc_per} cov={meandepth} asmb={assembler}"
-                  if assembler != 'unicycler':
-                      header += f" stp={step}"
-                  header += "\\n"
-                  # creating the dict
-                  fasta_dict[contig] = {
-                      'seq' : '',
-                      'header' : header,
-                      'length' : int(length)
-                  }
-              else:
-                  fasta_dict[contig]['seq'] += line
-      
-      sorted_dict = dict(sorted(fasta_dict.items(), key=lambda x: x[1]['length'], reverse = True))
-      with open(f"consensus/{header_dict['fasta']}", 'w') as outfile:    
-          for contig in sorted_dict:
-              seq = '\\n'.join([fasta_dict[contig]['seq'][i:i+70] for i in range(0, len(fasta_dict[contig]['seq']), 70)])
-              outfile.write(fasta_dict[contig]['header'])
-              outfile.write(f"seq\\n")
+              searching_line = line.split(",")
+              if searching_line[0] == name and searching_line[-1] == "N":
+                  return False
+      return True
 
-      if not circ_check:
-          with open(f"consensus/sub_{header_dict['fasta']}", 'w') as outfile:
-              i = 0
-              for contig in sorted_dict:
-                  if i < 1:
-                      sub_header = f">{fasta_dict[contig]['header'].split()[0]} [location=chromosome][topology=circular][completeness=complete]\\n"
+
+def sub_fasta(fasta):
+      with open(fasta, 'r') as file:
+          i = 0
+          with open(f"consensus/sub_{fasta}", 'w') as outfile:
+              for line in file:
+                  line = line.strip()
+                  if line.startswith('>') and i < 1:
+                      outfile.write(f">{line.split()[0]} [location=chromosome][topology=circular][completeness=complete]\\n")
+                      i += 1
+                  elif line.startswith('>') and i >= 1:
+                      outfile.write(f">{line.split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n")
                   else:
-                      sub_header = f">{fasta_dict[contig]['header'].split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n"
+                      outfile.write(f"{line}\\n")
 
-                  i += 1
 
-                  outfile.write(sub_header)
-                  seq = '\\n'.join([fasta_dict[contig]['seq'][i:i+70] for i in range(0, len(fasta_dict[contig]['seq']), 70)])
-                  outfile.write(seq + '\\n')
-
-  def main():
+def main():
     
-    os.mkdir('consensus')
-    header_dict = {}
-    fasta = glob.glob('*.fasta')[0]
-    header_dict['fasta'] = fasta
-    name = fasta.replace('.fasta', '')
-    assemblers = ['flye', 'myloasm', 'raven', 'unicycler']
-    steps = ['reoriented', 'clair3', 'polypolish', 'pypolca']
+      os.mkdir('consensus')
     
-    for step in steps:
-      if step in name:
-        header_dict['step'] = step
-        name = name.replace(f"_{step}",'')
-        break
+      fasta = glob.glob('*.fasta')[0]
     
-      if 'step' not in header_dict.keys():
-          header_dict['step'] = False
+      shutil.copy(fasta, f"consensus/{fasta}")
+    
+      if check_circ('gfastats_summary.csv', fasta):
+    
+          sub_fasta(fasta)
 
-    for assembler in assemblers:
-      if assembler in name:
-        header_dict['assembler'] = assembler
-        name = name.replace(f"_{assembler}",'')
-        break
-
-    header_dict['name'] = name
-    gfa_dict        = gfastats_to_dict(header_dict)
-    circulocov_dict = circulocov_to_dict(header_dict)
-    copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict)
-
-  if __name__ == '__main__':
-    main()
+if __name__ == '__main__':
+      main()
   """
 }
 
@@ -694,6 +628,7 @@ process gfa_to_fasta {
   when:
   task.ext.when == null || task.ext.when
 
+  script:
   """
   #!/usr/bin/env python3
   import csv
@@ -746,7 +681,7 @@ process mash {
   tuple val(meta), file(illumina), file(nanopore)
 
   output:
-  tuple val(meta), env(dist), optional: true, emit: dist
+  tuple val(meta), env("dist"), optional: true, emit: dist
   path "mash/*", optional: true, emit: txt
   path "versions.yml", emit: versions
   
@@ -1086,6 +1021,44 @@ process seqkit {
   """  
 }
 
+process sort {
+  tag           "${meta.id}"
+  label         "process_low"
+  // no publishdir by default
+  container     'staphb/seqkit:2.10.0'
+  time          '10m'
+
+  input:
+  tuple val(meta), file(fasta), file(stats)
+
+  output:
+  tuple val(meta), file("*/*.fasta"), file(stats), emit: fasta
+  path "versions.yml", emit: versions
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def args   = task.ext.args   ?: '--two-pass'
+  def prefix = task.ext.prefix ?: "${fasta.baseName}"
+  """
+  mkdir -p seqkit
+
+  seqkit sort \
+    ${args} \
+    --by-length \
+    --reverse \
+    ${fasta} > \
+    seqkit/${prefix}.fasta
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    seqkit: \$(seqkit version | sed 's/v//g' | awk '{print \$NF}')
+  END_VERSIONS
+  """  
+}
+
+
 process summary {
   tag           "Creating summary"
   label         "process_low"
@@ -1115,7 +1088,11 @@ process summary {
       results = {}
       files = glob.glob('short_summary*txt')
       for file in files:
-        sample, assembler, step = file.split('.')[-2].rsplit("_", 2)
+        if len(file.split('.')[-2].split('_')) > 2:
+          sample, assembler, step = file.split('.')[-2].rsplit("_", 2)
+        else:
+          sample, assembler = file.split('.')[-2].rsplit("_", 1)
+          step = 'unicycler'
         if sample not in results.keys():
           results[sample] = {}
         if assembler not in results[sample].keys():
@@ -1706,7 +1683,10 @@ workflow DONUT_FALLS {
     if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
       gfa_to_fasta(gfastats.out.stats.filter { it -> !(it[1] =~ /unicycler/ )} )
 
-      dnaapler(gfa_to_fasta.out.fasta)
+      sort(gfa_to_fasta.out.fasta)
+      ch_versions = ch_versions.mix(sort.out.versions)
+
+      dnaapler(sort.out.fasta)
       ch_versions = ch_versions.mix(dnaapler.out.versions)
 
       ch_consensus  = ch_consensus.mix(dnaapler.out.fasta)
@@ -1714,7 +1694,16 @@ workflow DONUT_FALLS {
     }
 
     ch_reoriented
+      .branch {
+        myloasm: it =~ /myloasm/
+        raven: it =~ /raven/
+        flye: it =~ /flye/
+      }
+      .set { ch_reoriented_out }
+
+    ch_reoriented_out.flye
       .join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true)
+      .mix(ch_reoriented_out.raven.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
       .mix(ch_unicycler_fa.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
       .filter{ it -> if (it) {it[1]}}
       .set{ch_assembly_reads}
@@ -1736,10 +1725,24 @@ workflow DONUT_FALLS {
 
       bcftools(clair3.out.vcf)
       ch_versions = ch_versions.mix(bcftools.out.versions)
-      ch_clair3_fa = ch_clair3_fa.mix(bcftools.out.fasta)
       ch_consensus = ch_consensus.mix(bcftools.out.fasta)
 
-      bwa(ch_clair3_fa.join(ch_dist_filter, by:0, remainder: false))
+      ch_clair3_fa = ch_clair3_fa.mix(bcftools.out.fasta)
+
+      ch_clair3_fa
+        .branch {
+          myloasm: it =~ /myloasm/
+          raven: it =~ /raven/
+          flye: it =~ /flye/
+        }
+        .set { ch_clair3_out }   
+
+      ch_clair3_out.flye
+        .join(ch_dist_filter, by:0, remainder: false)
+        .mix(ch_clair3_out.raven.join(ch_dist_filter, by:0, remainder: false))
+        .set { ch_clair3_polished }
+
+      bwa(ch_clair3_polished)
       ch_versions = ch_versions.mix(bwa.out.versions.first())
 
       polypolish(bwa.out.sam)
@@ -1797,12 +1800,7 @@ workflow DONUT_FALLS {
 
     multiqc(ch_summary.unique().collect())
 
-    ch_consensus
-      .combine(circulocov_summary)
-      .combine(gfastats_summary)
-      .set { ch_fasta_info }
-
-    copy(ch_fasta_info)
+    copy(ch_consensus.combine(gfastats_summary))
 
   emit:
     gfa              = ch_gfa
