@@ -17,7 +17,7 @@ Donut Falls is a [Nextflow](https://www.nextflow.io/) workflow developed by [@er
 
 Donut Falls is also included in the staphb toolkit [staphb-toolkit](https://github.com/StaPH-B/staphb_toolkit). 
 
-We made a [wiki](https://github.com/UPHL-BioNGS/Donut_Falls/wiki), please read it!
+We made a [wiki](https://github.com/UPHL-BioNGS/Donut_Falls/wiki). Please read it!
 
 ## Wiki table of contents:
 - [Installation](https://github.com/UPHL-BioNGS/Donut_Falls/wiki/Installation)
@@ -69,14 +69,6 @@ These are specified with the `assembler` paramater. If Illumina reads are found,
 
 Note: more than one assembler can be chosen (i.e. `params.assembler = 'flye,raven'`). This will run the input files on each assembler listed. Listing an assembler more than once will not create additional assemblies with that tool (i.e. `params.assembler = 'flye,flye,flye'` will still only run the input files through flye once).
 
-### Reading the sequencing summary file
-Although not used for anything else, the sequencing summary file can be read in and put through nanoplot to visualize the quality of a sequencing run. This is an optional file and can be set with 'params.sequencing_summary'. 
-```
-nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sequencing_summary <sequencing summary file>
-```
-* WARNING : Does not work with _older_ versions of the summary file.
-
-
 ## Examples
 ```
 # nanopore assembly with flye followed by polishing if illumina files are supplied
@@ -101,22 +93,25 @@ nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet
 nextflow run UPHL-BioNGS/Donut_Falls -profile docker,test --sample_sheet sample_sheet.csv
 ```
 
-## Credits
+## Acknowledgement
 
 Donut Falls would not be possible without
 - [bandage](https://github.com/rrwick/Bandage) : visualize gfa files
+- [bcftools](https://github.com/samtools/bcftools) : apply clair3 polishing
 - [busco](https://gitlab.com/ezlab/busco) : assessment of assembly quality
 - [bwa](https://github.com/lh3/bwa) : aligning reads for polypolish
 - [circulocov](https://github.com/erinyoung/CirculoCov) : read depth per contig
+- [clair3](https://github.com/HKU-BAL/Clair3) : long-read polishing
 - [dnaapler](https://github.com/gbouras13/dnaapler) : rotation
-- [fastp](https://github.com/OpenGene/fastp) : cleaning illumina reads (default values) and nanopore reads (minimum length = 1,000 & minimum Q = 12)
+- [fastp](https://github.com/OpenGene/fastp) : cleaning illumina reads
+- [fastplong](https://github.com/OpenGene/fastplong) : cleaning nanopore reads
 - [flye](https://github.com/fenderglass/Flye) : de novo assembly (default assembler)
 - [gfastats](https://github.com/vgl-hub/gfastats) : assessment of assembly
-- [medaka](https://github.com/nanoporetech/medaka) : polishing with nanopore reads
+- [mash](https://github.com/marbl/Mash) : determines distance between reads for QC check
 - [multiqc](https://multiqc.info/) : amalgamation of results
-- [nanoplot](https://github.com/wdecoster/NanoPlot) : fastq file QC visualization
 - [polypolish](https://github.com/rrwick/Polypolish) : reduces sequencing artefacts through polishing with Illumina reads
 - [pypolca](https://github.com/gbouras13/pypolca) : reduces sequencing artefacts through polishing with Illumina reads
 - [rasusa](https://github.com/mbhall88/rasusa) : subsampling nanopore reads to 150X depth
 - [raven](https://github.com/lbcb-sci/raven) : de novo assembly option (params.assembler = 'raven')
+- [seqkit](https://github.com/shenwei356/seqkit) : fastq stats and sorting
 - [unicycler](https://github.com/rrwick/Unicycler) : hybrid assembly option (params.assembler = 'unicycler')
