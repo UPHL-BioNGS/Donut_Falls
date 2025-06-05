@@ -30,7 +30,7 @@ println('')
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
 if (params.config_file) {
-  def src = new File("${workflow.projectDir}/configs/donut_falls_config_template.config")
+  def src = new File("${workflow.projectDir}/configs/donut_falls_template.config")
   def dst = new File("${workflow.launchDir}/edit_me.config")
   dst << src.text
   println("A config file can be found at ${workflow.launchDir}/edit_me.config")
