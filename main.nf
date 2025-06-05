@@ -30,7 +30,7 @@ println('')
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
 if (params.config_file) {
-  def src = new File("${workflow.projectDir}/configs/donut_falls_config_template.config")
+  def src = new File("${workflow.projectDir}/configs/donut_falls_template.config")
   def dst = new File("${workflow.launchDir}/edit_me.config")
   dst << src.text
   println("A config file can be found at ${workflow.launchDir}/edit_me.config")
@@ -74,15 +74,6 @@ paramCheck(params.keySet())
 // Input files
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
-
-if (params.sequencing_summary){
-  Channel
-    .fromPath("${params.sequencing_summary}", type: 'file', checkIfExists: true)
-    .view { "Summary File : $it" }
-    .set { ch_sequencing_summary }
-} else {
-  ch_sequencing_summary = Channel.empty()
-}
 
 // using a sample sheet with the column header of 'sample,fastq,fastq_1,fastq_2'
 // sample  = meta.id
@@ -141,7 +132,7 @@ process bandage {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${gfa.baseName}"
   """
@@ -156,6 +147,45 @@ process bandage {
   END_VERSIONS
   """
 }
+
+process bcftools {
+  tag           "${meta.id}"
+  label         'process_medium'
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/bcftools:1.21'
+  time          '10m'
+
+  input:
+  tuple val(meta), file(fasta), file(vcf)
+
+  output:
+  tuple val(meta), file("clair3/*_clair3.fasta"), emit: fasta, optional: true
+  path "versions.yml", emit: versions
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def args   = task.ext.args   ?: ""
+  def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_reoriented','')}"
+  """
+  mkdir -p clair3 logs/${task.process}
+
+  bcftools index ${vcf}
+  
+  bcftools consensus \
+    ${args} \
+    -f ${fasta} \
+    ${vcf} \
+    -o clair3/${prefix}_clair3.fasta
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    bcftools: \$(bcftools --version | head -n 1 | awk '{print \$NF}')
+  END_VERSIONS
+  """
+}
+
 
 process busco {
   tag           "${meta.id}"
@@ -175,7 +205,7 @@ process busco {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: '--offline -l /busco_downloads/lineages/bacteria_odb10'
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   """
@@ -196,7 +226,7 @@ process bwa {
   tag           "${meta.id}"
   label         'process_high'
   // no publishDir because the sam files are too big
-  container     'staphb/bwa:0.7.18'
+  container     'staphb/bwa:0.7.19'
   time          '2h'
 
   input:
@@ -209,7 +239,7 @@ process bwa {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   """
@@ -228,8 +258,8 @@ process bwa {
 
 process circulocov {
   tag           "${meta.id}"
-  label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  label         "process_high"
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "circulocov/*/*"
   container     'staphb/circulocov:0.1.20240104'
   time          '1h'
 
@@ -239,6 +269,7 @@ process circulocov {
   output:
   path "circulocov/*overall_summary.txt", emit: summary
   tuple val(meta), file("circulocov/*/overall_summary.txt"), emit: results
+  tuple val(meta), file(fasta), file("circulocov/*/*map-ont.bam"), file("circulocov/*/*map-ont.bam.bai"), emit: bam
   path "circulocov/*/*", emit: everything
   path "circulocov/*/fastq/*", emit: fastq
   path "versions.yml", emit: versions
@@ -246,7 +277,7 @@ process circulocov {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: '-a'
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   def reads  = (illumina =~ /input/) ? "" : "--illumina ${illumina.join(' ')}"
@@ -270,15 +301,56 @@ process circulocov {
   """
 }
 
-process copy {
+process clair3 {
   tag           "${meta.id}"
-  label         'process_low'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  label         'process_medium'
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "clair3/*"
+  container     'staphb/clair3:1.1.0'
   time          '10m'
 
   input:
-  tuple val(meta), file(fasta), file(circulocov), file(gfastats)
+  tuple val(meta), file(fasta), file(bam), file(bai)
+
+  output:
+  tuple val(meta), file(fasta), path("clair3/merge_output.vcf.gz"), emit: vcf
+  path("clair3/*"), emit: everything
+  path "versions.yml", emit: versions
+  
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def args = task.ext.args ?: '--include_all_ctgs'
+  def prefix = task.ext.prefix ?: "${meta.id}"
+  """
+  mkdir -p clair3/${prefix}
+
+  samtools faidx ${fasta}
+
+  run_clair3.sh ${args} \
+    --bam_fn=${bam[0]} \
+    --ref_fn=${fasta} \
+    --threads=${task.cpus} \
+    --output=clair3 \
+    --platform=ont \
+    --model_path /clair3/models/ont
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    clair3: \$(run_clair3.sh  --version | awk '{print \$NF}')
+  END_VERSIONS
+  """
+}
+
+process copy {
+  tag           "${meta.id}"
+  label         'process_medium'
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/multiqc:1.28'
+  time          '10m'
+
+  input:
+  tuple val(meta), file(fasta), file(gfastats)
 
   output:
   path "consensus/*", emit: fastas
@@ -286,111 +358,55 @@ process copy {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   """
-  #!/usr/bin/env python3
-  import glob
-  import json
-  import csv
-  import os
+  #!/usr/bin/env python3 
+import glob
+import os
+import shutil
 
-  def gfastats_to_dict(header_dict):
-    dict = {}
-    with open('gfastats_summary.csv', mode='r') as file:
-      reader = csv.DictReader(file)
-      for row in reader:
-        if row['sample'] == header_dict['name'] + '_' + header_dict['assembler']:
-          key = row['Header']
-          dict[key] = row
-    return dict
+def check_circ(file, name):
+      for x in [".fasta", "_reoriented", "_clair3", "_polypolish", "_pypolca"]:
+          name = name.replace(x, "")
 
-  def circulocov_to_dict(header_dict):
-    dict = {}
-    with open('circulocov_summary.txt', mode='r', newline='') as file:
-        reader = csv.DictReader(file, delimiter='\\t')
-        for row in reader:
-          if row['sample'].replace('_reoriented','') == header_dict['name'] + '_' + header_dict['assembler'] :
-            key = row['contigs']
+      with open(file, "r") as f:
+          for line in f:
+              line = line.strip()
+              searching_line = line.split(",")
+              if searching_line[0] == name and searching_line[-1] == "N":
+                  return False
+      return True
 
-            dict[key] = row
-    return dict
 
-  def copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict):
-    with open(fasta, 'r') as file:
-      fasta_dict = {}
-      for line in file:
-        line = line.strip()
-        if line.startswith('>'):
-          contig    = str(line.replace('>','').split()[0])
-          circular  = gfa_dict[contig]['Is circular'].replace('Y','true').replace('N','false')
-          length    = gfa_dict[contig]['Total segment length']
-          gc_per    = gfa_dict[contig]['GC content %']
-          meandepth = circulocov_dict[contig]['nanopore_meandepth']
-          assembler = header_dict['assembler']
-          step      = header_dict['step']
-          
-          # creating the header
-          header = '>' + contig
-          header = header + ' circ=' + circular
-          header = header + ' len=' + length
-          header = header + ' gc=' + gc_per
-          header = header + ' cov=' + meandepth
-          header = header + ' asmb=' + assembler 
-          if assembler != 'unicycler':
-            header = header + ' stp=' + step
-          header = header + '\\n'
+def sub_fasta(fasta):
+      with open(fasta, 'r') as file:
+          i = 0
+          with open(f"consensus/sub_{fasta}", 'w') as outfile:
+              for line in file:
+                  line = line.strip()
+                  if line.startswith('>') and i < 1:
+                      outfile.write(f">{line.split()[0]} [location=chromosome][topology=circular][completeness=complete]\\n")
+                      i += 1
+                  elif line.startswith('>') and i >= 1:
+                      outfile.write(f">{line.split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n")
+                  else:
+                      outfile.write(f"{line}\\n")
 
-          # creating the dict
-          fasta_dict[contig] = {}
-          fasta_dict[contig]['seq']    = ''
-          fasta_dict[contig]['header'] = header
-          fasta_dict[contig]['length'] = int(length)
 
-        else:
-          fasta_dict[contig]['seq'] = fasta_dict[contig]['seq'] + line
+def main():
     
-    sorted_dict = dict(sorted(fasta_dict.items(), key=lambda item: item[1]['length'], reverse = True))
+      os.mkdir('consensus')
+    
+      fasta = glob.glob('*.fasta')[0]
+    
+      shutil.copy(fasta, f"consensus/{fasta}")
+    
+      if check_circ('gfastats_summary.csv', fasta):
+    
+          sub_fasta(fasta)
 
-    with open(f"consensus/{header_dict['fasta']}", 'w') as outfile:    
-      for contig in sorted_dict:
-        seq = '\\n'.join([fasta_dict[contig]['seq'][i:i+70] for i in range(0, len(fasta_dict[contig]['seq']), 70)])
-        outfile.write(fasta_dict[contig]['header'])
-        outfile.write(seq + '\\n')
-
-  def main():
-    os.mkdir('consensus')
-    header_dict = {}
-    fasta = glob.glob('*.fasta')[0]
-    header_dict['fasta'] = fasta
-
-    name = fasta.replace('.fasta', '')
-
-    assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
-    steps = ['reoriented', 'polypolish', 'pypolca', 'medaka']
-    for step in steps:
-      if step in name:
-        header_dict['step'] = step
-        name = name.replace(f"_{step}",'')
-        break
-
-    if 'step' not in header_dict.keys():
-      header_dict['step'] = False
-
-    for assembler in assemblers:
-      if assembler in name:
-        header_dict['assembler'] = assembler
-        name = name.replace(f"_{assembler}",'')
-        break
-
-    header_dict['name'] = name
-
-    gfa_dict        = gfastats_to_dict(header_dict)
-    circulocov_dict = circulocov_to_dict(header_dict)
-
-    copy_fasta(fasta, header_dict, gfa_dict, circulocov_dict)
-
-  if __name__ == '__main__':
-    main()
+if __name__ == '__main__':
+      main()
   """
 }
 
@@ -398,7 +414,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:1.0.1'
+  container     'staphb/dnaapler:1.2.0'
   time          '1h'
 
   input:
@@ -412,7 +428,7 @@ process dnaapler {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   """
@@ -434,7 +450,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:0.24.0'
+  container     'staphb/fastp:0.24.1'
 
   input:
   tuple val(meta), file(reads)
@@ -448,7 +464,7 @@ process fastp {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
@@ -487,7 +503,7 @@ process fastplong {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
@@ -510,7 +526,7 @@ process flye {
   tag           "${meta.id}"
   label         "process_high"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/flye:2.9.5'
+  container     'staphb/flye:2.9.6'
   time          '10h'
 
   input:
@@ -526,7 +542,7 @@ process flye {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args      = task.ext.args   ?: ''
   def read_type = task.ext.read_type ?: '--nano-hq'
   def prefix    = task.ext.prefix ?: "${meta.id}"
@@ -557,7 +573,7 @@ process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "gfastats/*"
-  container     'staphb/gfastats:1.3.7'
+  container     'staphb/gfastats:1.3.10'
   time          '10m'
 
   input:
@@ -572,7 +588,7 @@ process gfastats {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${gfa.baseName}"
   """
@@ -583,7 +599,7 @@ process gfastats {
     ${args} \
     --threads ${task.cpus} \
     --tabular \
-    --seq-report \
+    --segment-report \
     > gfastats/${prefix}_gfastats.txt
 
   head -n 1 gfastats/${prefix}_gfastats.txt | tr "\\t" "," | awk '{print "sample," \$0 }' > gfastats/${prefix}_gfastats_summary.csv
@@ -600,7 +616,7 @@ process gfa_to_fasta {
   tag           "${meta.id}"
   label         "process_low"
   // no publishDir
-  container     'staphb/multiqc:1.26'
+  container     'staphb/multiqc:1.28'
   time          '10m'
 
   input:
@@ -612,9 +628,9 @@ process gfa_to_fasta {
   when:
   task.ext.when == null || task.ext.when
 
+  script:
   """
   #!/usr/bin/env python3
-
   import csv
   import glob
 
@@ -648,6 +664,7 @@ process gfa_to_fasta {
   gfa_file = glob.glob("*.gfa")
 
   summary_dict = read_summary_csv(gfastats_file[0])
+
   convert_to_fasta(summary_dict, gfa_file[0])
   """
 }
@@ -664,14 +681,14 @@ process mash {
   tuple val(meta), file(illumina), file(nanopore)
 
   output:
-  tuple val(meta), env(dist), optional: true, emit: dist
+  tuple val(meta), env("dist"), optional: true, emit: dist
   path "mash/*", optional: true, emit: txt
   path "versions.yml", emit: versions
   
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args     = task.ext.args     ?: ''
   def ont_args = task.ext.ont_args ?: '-m 2'
   def ill_args = task.ext.ill_args ?: '-m 2'
@@ -703,56 +720,11 @@ process mash {
   """
 }
 
-// From https://github.com/nanoporetech/medaka
-// > It is not recommended to specify a value of --threads greater than 2 for medaka consensus since the compute scaling efficiency is poor beyond this.
-// > Note also that medaka consensus may been seen to use resources equivalent to <threads> + 4 as an additional 4 threads are used for reading and preparing input data.
-process medaka {
-  tag           "${meta.id}"
-  label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/medaka:2.0.1'
-  time          '30m'
-
-  input:
-  tuple val(meta), path(fasta), path(fastq)
-
-  output:
-  tuple val(meta), path("medaka/*_medaka.fasta"), emit: fasta
-  path "medaka/*", emit: everything
-  path "versions.yml", emit: versions
-  
-  when:
-  task.ext.when == null || task.ext.when
-
-  shell:
-  def args   = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_reoriented','')}"
-  """
-  mkdir -p medaka
-
-  # someday...
-  # medaka tools resolve_model --auto_model consensus ${fastq}
-
-  medaka_consensus ${args} \
-    -i ${fastq} \
-    -d ${fasta} \
-    -o medaka \
-    -t 1
-
-  if [ -f "medaka/consensus.fasta" ]; then cp medaka/consensus.fasta medaka/${prefix}_medaka.fasta ; fi
-
-  cat <<-END_VERSIONS > versions.yml
-  "${task.process}":
-    medaka: \$( medaka --version | awk '{print \$NF}')
-  END_VERSIONS
-  """
-}
-
 process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.28'
   time          '10m'
 
   input:
@@ -765,242 +737,12 @@ process multiqc {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   """
-  if [ -f "pypolca_summary.tsv" ]
-  then
-    echo "# plot_type: 'table'" > pypolca_mqc.txt
-    echo "# section_name: 'pypolca'" >> pypolca_mqc.txt
-    echo "# description: 'Long read polishing'" >> pypolca_mqc.txt
-    echo "# pconfig:" >> pypolca_mqc.txt
-    echo "#     namespace: 'Cust Data'" >> pypolca_mqc.txt
-    echo "# headers:" >> pypolca_mqc.txt
-    echo "#     Substitution_Errors_Found:" >> pypolca_mqc.txt
-    echo "#         title: 'Substitution Errors Found'" >> pypolca_mqc.txt
-    echo "#         description: 'Substitution Errors Found'" >> pypolca_mqc.txt
-    echo "#     Insertion/Deletion_Errors_Found:" >> pypolca_mqc.txt
-    echo "#         title: 'Insertion/Deletion Errors Found'" >> pypolca_mqc.txt
-    echo "#         description: 'Insertion/Deletion Errors Found'" >> pypolca_mqc.txt
-    echo "#     Assembly_Size:" >> pypolca_mqc.txt
-    echo "#         title: 'Assembly Size'" >> pypolca_mqc.txt
-    echo "#         description: 'Assembly Size'" >> pypolca_mqc.txt
-    echo "#     Consensus_Quality_Before_Polishing:" >> pypolca_mqc.txt
-    echo "#         title: 'Consensus Quality Before Polishing'" >> pypolca_mqc.txt
-    echo "#         description: 'Consensus Quality Before Polishing'" >> pypolca_mqc.txt
-    echo "#     Consensus_QV_Before_Polishing:" >> pypolca_mqc.txt
-    echo "#         title: 'Consensus QV Before Polishing'" >> pypolca_mqc.txt
-    echo "#         description: 'Consensus QV Before Polishing'" >> pypolca_mqc.txt
-    cat pypolca_summary.tsv >> pypolca_mqc.txt
-  fi
-
-  if [ -f "gfastats_summary.csv" ]
-  then
-    echo "# plot_type: 'table'" > gfastats_mqc.csv
-    echo "# section_name: 'gfastats'" >> gfastats_mqc.csv
-    echo "# description: 'Metrics for GFA files'" >> gfastats_mqc.csv
-    echo "# pconfig:" >> gfastats_mqc.csv
-    echo "#     namespace: 'Cust Data'" >> gfastats_mqc.csv
-    echo "# headers:" >> gfastats_mqc.csv
-    echo "#     sample:" >> gfastats_mqc.csv
-    echo "#         title: 'Sample and analysis'" >> gfastats_mqc.csv
-    echo "#         description: 'Sample and analysis that generated contig'" >> gfastats_mqc.csv
-    echo "#     Header:" >> gfastats_mqc.csv
-    echo "#         title: 'Header'" >> gfastats_mqc.csv
-    echo "#         description: 'Name of contig'" >> gfastats_mqc.csv
-    echo "#     Total segment length:" >> gfastats_mqc.csv
-    echo "#         title: 'Total segment length'" >> gfastats_mqc.csv
-    echo "#         description: 'Total segment length'" >> gfastats_mqc.csv
-    echo "#     A:" >> gfastats_mqc.csv
-    echo "#         title: 'A'" >> gfastats_mqc.csv
-    echo "#         description: 'Number of A'" >> gfastats_mqc.csv
-    echo "#     C:" >> gfastats_mqc.csv
-    echo "#         title: 'C'" >> gfastats_mqc.csv
-    echo "#         description: 'Number of C'" >> gfastats_mqc.csv
-    echo "#     G:" >> gfastats_mqc.csv
-    echo "#         title: 'G'" >> gfastats_mqc.csv
-    echo "#         description: 'Number of G'" >> gfastats_mqc.csv
-    echo "#     T:" >> gfastats_mqc.csv
-    echo "#         title: 'T'" >> gfastats_mqc.csv
-    echo "#         description: 'Number of T'" >> gfastats_mqc.csv
-    echo "#     GC content %:" >> gfastats_mqc.csv
-    echo "#         title: 'GC content %'" >> gfastats_mqc.csv
-    echo "#         description: 'GC content %'" >> gfastats_mqc.csv
-    echo "#     # soft-masked bases:" >> gfastats_mqc.csv
-    echo "#         title: '# soft-masked bases'" >> gfastats_mqc.csv
-    echo "#         description: '# soft-masked bases'" >> gfastats_mqc.csv
-    echo "#     Is circular:" >> gfastats_mqc.csv
-    echo "#         title: 'Is circular'" >> gfastats_mqc.csv
-    echo "#         description: 'Is circular'" >> gfastats_mqc.csv
-    cat gfastats_summary.csv | awk '{print NR ',' \$0}' >> gfastats_mqc.csv
-  fi
-
-  if [ -f "flye_summary.tsv" ]
-  then
-    echo "# plot_type: 'table'" > flye_mqc.csv
-    echo "# section_name: 'flye'" >> flye_mqc.csv
-    echo "# description: 'Assembly Info'" >> flye_mqc.csv
-    echo "# pconfig:" >> flye_mqc.csv
-    echo "#     namespace: 'Cust Data'" >> flye_mqc.csv
-    echo "# headers:" >> flye_mqc.csv
-    echo "#     sample:" >> flye_mqc.csv
-    echo "#         title: 'Sample'" >> flye_mqc.csv
-    echo "#         description: 'Sample that generated contig'" >> flye_mqc.csv
-    echo "#     #seq_name:" >> flye_mqc.csv
-    echo "#         title: '#seq_name'" >> flye_mqc.csv
-    echo "#         description: 'Name of contig'" >> flye_mqc.csv
-    echo "#     length:" >> flye_mqc.csv
-    echo "#         title: 'length'" >> flye_mqc.csv
-    echo "#         description: 'length'" >> flye_mqc.csv
-    echo "#     cov.:" >> flye_mqc.csv
-    echo "#         title: 'cov'" >> flye_mqc.csv
-    echo "#         description: 'Coverage'" >> flye_mqc.csv
-    echo "#     circ:" >> flye_mqc.csv
-    echo "#         title: 'circ'" >> flye_mqc.csv
-    echo "#         description: 'Whether contig is circular'" >> flye_mqc.csv
-    echo "#     repeat:" >> flye_mqc.csv
-    echo "#         title: 'repeat'" >> flye_mqc.csv
-    echo "#         description: 'repeat'" >> flye_mqc.csv
-    echo "#     mult.:" >> flye_mqc.csv
-    echo "#         title: 'mult'" >> flye_mqc.csv
-    echo "#         description: 'mult.'" >> flye_mqc.csv
-    echo "#     alt_group:" >> flye_mqc.csv
-    echo "#         title: 'alt_group'" >> flye_mqc.csv
-    echo "#         description: 'alt_group'" >> flye_mqc.csv
-    echo "#     graph_path:" >> flye_mqc.csv
-    echo "#         title: 'graph_path'" >> flye_mqc.csv
-    echo "#         description: 'graph_path'" >> flye_mqc.csv
-    cat flye_summary.tsv | awk '{print NR '\\t' \$0}' >> flye_mqc.csv
-  fi
-
-  circulocov_check=\$(ls * | grep overall_summary.txt | head -n 1)
-  if [ -n "\$circulocov_check" ]
-  then
-    illumina_check=\$(grep -h illumina *overall_summary.txt | head -n 1)
-    if [ -n "\$illumina_check" ]
-    then
-      circulocov_summary_header=\$illumina_check
-    else
-      circulocov_summary_header=\$(grep -h nanopore_numreads *overall_summary.txt | head -n 1)
-    fi
-
-    echo \$circulocov_summary_header | awk '{print \$1 "\\t" \$2 "\\t" \$3 "\\t" \$4 "\\t" \$5 "\\t" \$6 "\\t" \$7 "\\t" \$8 "\\t" \$9 "\\t" \$10 "\\t" \$11 "\\t" \$12}' > circulocov_summary.txt
-    cat *overall_summary.txt | grep -v nanopore_numreads | awk '{print \$1 "\\t" \$2 "\\t" \$3 "\\t" \$4 "\\t" \$5 "\\t" \$6 "\\t" \$7 "\\t" \$8 "\\t" \$9 "\\t" \$10 "\\t" \$11 "\\t" \$12}' >> circulocov_summary.txt
-
-    echo "# plot_type: 'table'" > circulocov_mqc.txt
-    echo "# section_name: 'CirculoCov'" >> circulocov_mqc.txt
-    echo "# description: 'Coverage estimates for circular sequences'" >> circulocov_mqc.txt
-    echo "# pconfig:" >> circulocov_mqc.txt
-    echo "#     namespace: 'Cust Data'" >> circulocov_mqc.txt
-    echo "# headers:" >> circulocov_mqc.txt
-    echo "#     sample:" >> circulocov_mqc.txt
-    echo "#         title: 'Sample'" >> circulocov_mqc.txt
-    echo "#         description: 'Sample that generated contig'" >> circulocov_mqc.txt
-    echo "#     circ:" >> circulocov_mqc.txt
-    echo "#         title: 'circ'" >> circulocov_mqc.txt
-    echo "#         description: 'Whether contig was circular'" >> circulocov_mqc.txt
-    echo "#     contigs:" >> circulocov_mqc.txt
-    echo "#         title: 'contigs'" >> circulocov_mqc.txt
-    echo "#         description: 'name of contig'" >> circulocov_mqc.txt
-    echo "#     length:" >> circulocov_mqc.txt
-    echo "#         title: 'length'" >> circulocov_mqc.txt
-    echo "#         description: 'length of contig'" >> circulocov_mqc.txt
-    echo "#     nanopore_numreads:" >> circulocov_mqc.txt
-    echo "#         title: 'numreads'" >> circulocov_mqc.txt
-    echo "#         description: 'number of nanopore reads mapping to contig'" >> circulocov_mqc.txt
-    echo "#     nanopore_covbases:" >> circulocov_mqc.txt
-    echo "#         title: 'covbases'" >> circulocov_mqc.txt
-    echo "#         description: 'nanopore covbases of contig'" >> circulocov_mqc.txt
-    echo "#     nanopore_coverage:" >> circulocov_mqc.txt
-    echo "#         title: 'coverage'" >> circulocov_mqc.txt
-    echo "#         description: 'nanopore coverage of contig'" >> circulocov_mqc.txt
-    echo "#     nanopore_meandepth:" >> circulocov_mqc.txt
-    echo "#         title: 'meandepth'" >> circulocov_mqc.txt
-    echo "#         description: 'nanopore meandepth of contig'" >> circulocov_mqc.txt
-    cat circulocov_summary.txt | awk '{print NR '\\t' \$0}' >> circulocov_mqc.txt
-  fi
-
   multiqc ${args} \
     --outdir multiqc \
     .
-  """
-}
-
-process nanoplot_summary {
-  tag           "${summary}"
-  label         "process_low"
-  publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/nanoplot:1.42.0'
-  time          '30m'
-
-  input:
-  file(summary)
-
-  output:
-  path "nanoplot/*", emit: final_directory
-  path "versions.yml", emit: versions
-  
-  when:
-  task.ext.when == null || task.ext.when
-
-  shell:
-  def args   = task.ext.args   ?: ''
-  """
-  mkdir -p nanoplot
-  
-  NanoPlot ${args} \
-    --summary ${summary} \
-    --threads ${task.cpus} \
-    --outdir nanoplot \
-    --tsv_stats
-
-  cat <<-END_VERSIONS > versions.yml
-  "${task.process}":
-    nanoplot: \$(NanoPlot --version | awk '{print \$NF}')
-  END_VERSIONS
-  """
-}
-
-process nanoplot {
-  tag           "${meta.id}"
-  label         "process_low"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/nanoplot:1.42.0'
-  time          '10m'
-
-  input:
-  tuple val(meta), file(fastq)
-
-  output:
-  path "nanoplot/*", emit: everything
-  path "nanoplot/${meta.id}*_NanoStats.txt", emit: stats
-  path "nanoplot/${meta.id}*_NanoStats.csv", emit: summary
-  path "versions.yml", emit: versions
-
-  when:
-  task.ext.when == null || task.ext.when
-
-  shell:
-  def args   = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${meta.id}"
-  def readtype = fastq.toList().size() > 1 ? '_illumina' : ''
-  """
-  mkdir -p nanoplot
-
-  NanoPlot ${args} \
-    --fastq ${fastq.join(' ')} \
-    --threads ${task.cpus} \
-    --prefix ${prefix}${readtype}_ \
-    --tsv_stats \
-    --outdir nanoplot
-
-  echo "sample,\$(   cut -f 1 nanoplot/${prefix}${readtype}_NanoStats.txt | tr '\\n' ',' )" >  nanoplot/${prefix}${readtype}_NanoStats.csv
-  echo "${prefix}${readtype},\$(cut -f 2 nanoplot/${prefix}${readtype}_NanoStats.txt | tr '\\n' ',' )" >> nanoplot/${prefix}${readtype}_NanoStats.csv
-
-  cat <<-END_VERSIONS > versions.yml
-  "${task.process}":
-    nanoplot: \$(NanoPlot --version | awk '{print \$NF}')
-  END_VERSIONS
   """
 }
 
@@ -1008,7 +750,7 @@ process png {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}/bandage", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.28'
   time          '10m'
 
   input:
@@ -1020,11 +762,10 @@ process png {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
   #!/usr/bin/env python3
-
   from PIL import Image, ImageDraw, ImageFont
   import glob
   import shutil
@@ -1035,8 +776,8 @@ process png {
     png_files.sort()
 
     if len(png_files) >= 2:
-
       images_with_titles = []
+
       for file in png_files:
         analysis = str(file).split('_')[-1].split('.')[0]
         image = Image.open(file)
@@ -1046,16 +787,14 @@ process png {
 
       total_width = sum(image.width for image in images_with_titles)
       max_height  = max(image.height for image in images_with_titles)
-
       combined_image = Image.new("RGB", (total_width, max_height), color="white")
-
       offset = 0
+
       for image in images_with_titles:
         combined_image.paste(image, (offset, 0))
         offset += image.width
 
       combined_image.save("bandage_${prefix}_mqc.png")
-
       for image in images_with_titles:
           image.close()
 
@@ -1064,7 +803,6 @@ process png {
 
   if __name__ == "__main__":
       main()
-
   """
 }
 
@@ -1085,10 +823,10 @@ process polypolish {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def filarg = task.ext.args   ?: ''
-  def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_medaka','')}"
+  def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_clair3','')}"
   """
   mkdir -p polypolish
 
@@ -1132,7 +870,7 @@ process pypolca {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: '--careful'
   def prefix = task.ext.prefix ?: "${fasta.baseName.replaceAll('_polypolish','')}"
   """
@@ -1185,7 +923,7 @@ process rasusa {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args       = task.ext.args   ?: '--genome-size 5mb --coverage 150'
   def prefix     = task.ext.prefix ?: "${meta.id}"
   """
@@ -1223,7 +961,7 @@ process raven {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: '--polishing-rounds 2'
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
@@ -1242,11 +980,90 @@ process raven {
   """
 }
 
+process seqkit {
+  tag           "${meta.id}"
+  label         "process_low"
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/seqkit:2.10.0'
+  time          '10m'
+
+  input:
+  tuple val(meta), file(fastq)
+
+  output:
+  path("seqkit/*seqkit_stats.tsv"), emit: stats
+  path "versions.yml", emit: versions
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def args   = task.ext.args   ?: '--all'
+  def prefix = task.ext.prefix ?: "${meta.id}"
+  def ill_rds = fastq[1] ? "${fastq[1]} ${fastq[2]}" : ""
+  """
+  mkdir -p seqkit
+
+  seqkit stats \
+    ${args} \
+    --tabular \
+    --threads ${task.cpus} \
+    ${fastq[0]} \
+    ${ill_rds} | \
+    awk '{print "${prefix}\\t" \$0}' | \
+    sed 's/${prefix}\\tfile/sample\\tfile/g' > \
+    seqkit/${prefix}_seqkit_stats.tsv
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    seqkit: \$(seqkit version | sed 's/v//g' | awk '{print \$NF}')
+  END_VERSIONS
+  """  
+}
+
+process sort {
+  tag           "${meta.id}"
+  label         "process_low"
+  // no publishdir by default
+  container     'staphb/seqkit:2.10.0'
+  time          '10m'
+
+  input:
+  tuple val(meta), file(fasta), file(stats)
+
+  output:
+  tuple val(meta), file("*/*.fasta"), file(stats), emit: fasta
+  path "versions.yml", emit: versions
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def args   = task.ext.args   ?: '--two-pass'
+  def prefix = task.ext.prefix ?: "${fasta.baseName}"
+  """
+  mkdir -p seqkit
+
+  seqkit sort \
+    ${args} \
+    --by-length \
+    --reverse \
+    ${fasta} > \
+    seqkit/${prefix}.fasta
+
+  cat <<-END_VERSIONS > versions.yml
+  "${task.process}":
+    seqkit: \$(seqkit version | sed 's/v//g' | awk '{print \$NF}')
+  END_VERSIONS
+  """  
+}
+
+
 process summary {
   tag           "Creating summary"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.28'
   time          '30m'
   
   input:
@@ -1259,253 +1076,254 @@ process summary {
   when:
   task.ext.when == null || task.ext.when
 
+  script:
   """
   #!/usr/bin/env python3
-
   import glob
   import json
   import csv
   from os.path import exists
 
   def busco_results():
-      dict = {}
+      results = {}
       files = glob.glob('short_summary*txt')
       for file in files:
-        sample_analysis = file.split('.')[-2]
+        if len(file.split('.')[-2].split('_')) > 2:
+          sample, assembler, step = file.split('.')[-2].rsplit("_", 2)
+        else:
+          sample, assembler = file.split('.')[-2].rsplit("_", 1)
+          step = 'unicycler'
+        if sample not in results.keys():
+          results[sample] = {}
+        if assembler not in results[sample].keys():
+          results[sample][assembler] = {}      
         with open(file, 'r') as f:
           for line in f:
             if 'C:' and 'S:' and 'D:' and 'F:' and 'M:' and 'n:' in line:
-              dict[sample_analysis] = line.strip()
+              results[sample][assembler][step] = line.strip()
               break
-      return dict
+      return results
 
   def circulocov_results():
-      dict = {}
+      results = {}
       files = glob.glob('*overall_summary.txt')
       for file in files:
-        sample_analysis = file.replace('_overall_summary.txt', '').replace('_reoriented', '')
-        dict[sample_analysis] = {}
+        sample, assembler = file.replace('_reoriented_overall_summary.txt','').rsplit("_", 1)
+        if sample not in results.keys():
+          results[sample] = {}
+        if assembler not in results[sample].keys():
+          results[sample][assembler] = {}
+
         with open(file, 'r') as f:
-          for line in f:
-            parts = line.split()
-            if parts[2] == 'all':
-              dict[sample_analysis]['coverage'] = parts[7]
-              dict[sample_analysis]['nanopore_numreads'] = parts[5]
-              if len(parts) >= 9:
-                dict[sample_analysis]['illumina_numreads'] = parts[9]
+          reader = csv.DictReader(f, delimiter="\\t")
+          for row in reader:
+            results[sample][assembler][row['contigs']] = row
 
-            if parts[2] == 'missing':
-              if len(parts) > 8:
-                unmapped_illumina = parts[8]
-              else:
-                unmapped_illumina = 0
+        results[sample][assembler]['all']['warnings'] = ""
 
-              dict[sample_analysis]['unmapped_nanopore'] = parts[4]
-              dict[sample_analysis]['unmapped_illumina'] = unmapped_illumina
-      return dict
 
-  def file_to_dict(file, header, delim):
-      dict = {}
-      with open(file, mode='r', newline='') as file:
-        reader = csv.DictReader(file, delimiter=delim)
-        for row in reader:
-          key = row[header]
-          dict[key] = row
-      return dict
+        results[sample][assembler]['all']['unmapped_nanopore'] = results[sample][assembler]['missing']['nanopore_numreads'] if 'nanopore_numreads' in results[sample][assembler]['missing'].keys() else 0
+        results[sample][assembler]['all']['unmapped_nanopore_pc'] = round(float(results[sample][assembler]['all']['unmapped_nanopore']) / float(results[sample][assembler]['all']['nanopore_numreads']), 2)
+        if results[sample][assembler]['all']['unmapped_nanopore_pc'] > 0.1:
+          results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Nanopore reads,"
 
-  def file_to_dict_uniq(file, header, header2, delim):
-      dict = {}
-      with open(file, mode='r', newline='') as file:
-        reader = csv.DictReader(file, delimiter=delim)
-        for row in reader:
-          if row[header] not in dict.keys():
-            dict[row[header]] = {}
-          key = row[header] + '_' + row[header2]
-          dict[row[header]][key] = row
-      return dict
+        if 'illumina_numreads' in results[sample][assembler]['missing'].keys():
+          results[sample][assembler]['all']['unmapped_illumina'] = results[sample][assembler]['missing']['illumina_numreads']
+          results[sample][assembler]['all']['unmapped_illumina_pc'] = round(float(results[sample][assembler]['all']['unmapped_illumina']) / float(results[sample][assembler]['all']['illumina_numreads']), 2)
+          if results[sample][assembler]['all']['unmapped_illumina_pc'] > 0.1:
+            results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Illumina reads,"
+      return results
 
-  def final_file(dict):
+  def combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict):
+        final_results = seqkit_dict
+
+        for key in final_results.keys():
+
+          if key in mash_dict.keys():
+            final_results[key]['mash'] = mash_dict[key]
+
+          if key in pypolca_dict.keys():
+            final_results[key]['pypolca'] = pypolca_dict[key]
+
+          if key in gfastats_dict.keys():
+            final_results[key]['gfastats'] = gfastats_dict[key]
+
+          if key in busco_dict.keys():
+            final_results[key]['busco'] = busco_dict[key]
+
+          if key in circulocov_dict.keys():
+            final_results[key]['circulocov'] = circulocov_dict[key]
+
+          final_results[key]['assemblers'] = "${params.assembler}"
+        
+        return final_results
+          
+  def final_file(results):
       with open('donut_falls_summary.json', 'w') as json_file:
-        json.dump(dict, json_file, indent=4)
+        json.dump(results, json_file, indent=4)
+
+  def gfastats_file(file):
+      results = {}
+      with open(file, mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter=",")
+        for row in reader:
+          sample, assembler = row['sample'].rsplit("_", 1)
+          if sample not in results.keys():
+            results[sample] = {}
+          if assembler not in results[sample].keys():
+            results[sample][assembler] = {}
+          results[sample][assembler][row['Header']] = row
+
+      for sample in results.keys():
+        for assembler in results[sample].keys():
+          total_length = 0
+          num_circular = 0
+          contigs = list(results[sample][assembler].keys())
+          results[sample][assembler]['num_contigs'] = len(contigs)
+          for contig in contigs:
+            total_length = total_length + int(results[sample][assembler][contig]['Total segment length'])
+            if results[sample][assembler][contig]['Is circular'] == 'Y':
+              num_circular = num_circular + 1
+          results[sample][assembler]['total_length'] = total_length
+          results[sample][assembler]['circ_contigs'] = num_circular
+      return results
 
   def mash_file(file):
-      dict = {}
+      results = {}
       with open(file, mode = 'r') as file:
         reader = csv.DictReader(file, delimiter='\\t', fieldnames=['sample', 'illumina','nanopore', 'dist', 'pvalue', 'hash'])
         for row in reader:
           key = row['sample']
-          dict[key] = row
-      return dict
+          results[key] = row
+      return results
 
-  def tsv_file(dict):
-      final_dict = {}
+  def pypolca_file(file):
+      results = {}
+      with open(file, mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter='\\t')
+        for row in reader:
+          sample, assembler = row['sample'].rsplit("_", 1)
+          results[sample] = { assembler : row }
+      return results
+
+  def seqkit_file(file):
+      results = {}
+      with open(file, mode='r', newline='') as file:
+        reader = csv.DictReader(file, delimiter='\\t')
+        for row in reader:
+          key = row['sample']
+          fastq = row['file']
+          if key not in results.keys():
+            results[key] = {}
+          results[key][fastq] = row
+
+      for key in results.keys():
+        sorted_results = dict(sorted(results[key].items(), key=lambda fastq: float(fastq[1]['avg_len']), reverse=True))
+        results[key] = sorted_results
+        nanopore_fastq = list(results[key].keys())[0]
+        results[key][nanopore_fastq]['platform'] = 'nanopore'
+        results[key]['nanopore'] = results[key][nanopore_fastq]
+        del results[key][nanopore_fastq]
+
+        ill_fastq = []
+        results_keys = list(results[key].keys())      
+        for fastq in results_keys:
+          if 'platform' not in results[key][fastq].keys():
+            results[key][fastq]['platform'] = 'illumina'
+            ill_fastq.append(fastq)
+            results[key]['illumina'] = { 'platform' : 'illumina' }
+
+        if len(ill_fastq) > 1 :
+          for seqkit_val in ['num_seqs', 'sum_len', 'sum_gap', 'N50_num', 'sum_n']:
+            results[key]['illumina'][seqkit_val] = round(float(results[key][ill_fastq[0]][seqkit_val]) + float(results[key][ill_fastq[1]][seqkit_val]), 0)
+
+          for seqkit_val in ['avg_len', 'Q1', 'Q2', 'Q3', 'N50', 'Q20(%)', 'Q30(%)', 'AvgQual', 'GC(%)']:
+            results[key]['illumina'][seqkit_val] = round((float(results[key][ill_fastq[0]][seqkit_val]) + float(results[key][ill_fastq[1]][seqkit_val]))/2, 2)
+
+          results[key]['illumina']['file'] = f"{results[key][ill_fastq[0]]['file']},{results[key][ill_fastq[1]]['file']}"
+
+          results[key]['illumina']['min_len'] = min(
+            float(results[key][ill_fastq[0]]['min_len']), 
+            float(results[key][ill_fastq[1]]['min_len']))
+          
+          results[key]['illumina']['max_len'] = max(
+            float(results[key][ill_fastq[0]]['max_len']), 
+            float(results[key][ill_fastq[1]]['max_len']))
+          
+          del results[key][ill_fastq[0]]
+          del results[key][ill_fastq[1]]
+      return results
+
+  def tsv_file(results_dict):
+      final_results_dict = {}
+      
+      # converting the final dict to something tsv friendly
+      sorted_keys = list(sorted(results_dict.keys()))
+      all_keys = []
+      for sample in sorted_keys:
+        final_results_dict[sample] = {}
+        if 'nanopore' in results_dict[sample].keys():
+          for result in results_dict[sample]['nanopore'].keys():
+            final_results_dict[sample][f"seqkit_{result}"] = results_dict[sample]['nanopore'][result]
+
+        if 'illumina' in results_dict[sample].keys():
+          for result in results_dict[sample]['illumina'].keys():
+            final_results_dict[sample][f"seqkit_illumina_{result}"] = results_dict[sample]['illumina'][result]
+
+        if 'mash' in results_dict[sample].keys():
+          for result in results_dict[sample]['mash'].keys():
+            final_results_dict[sample][f"mash_{result}"] = results_dict[sample]['mash'][result]
+
+        for analysis in ['pypolca', 'busco']:
+          if analysis in results_dict[sample].keys():
+            for assembler in results_dict[sample][analysis].keys():
+              for result in results_dict[sample][analysis][assembler].keys():
+                final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
+
+        if 'gfastats' in results_dict[sample].keys():
+          for assembler in results_dict[sample]['gfastats'].keys():
+            for result in ['num_contigs', 'total_length', 'circ_contigs']:
+              final_results_dict[sample][f"{assembler}_gfastats_{result}"] = results_dict[sample]['gfastats'][assembler][result]
+
+        if 'circulocov' in results_dict[sample].keys():
+          for assembler in results_dict[sample]['circulocov'].keys():
+            for result in results_dict[sample]['circulocov'][assembler]['all'].keys():
+              final_results_dict[sample][f"{assembler}_circulocov_{result}"] = results_dict[sample]['circulocov'][assembler]['all'][result]
+        
+        all_keys += list(final_results_dict[sample].keys())
+
+      unique_key = list(set(all_keys))
+
       with open('donut_falls_summary.tsv', 'w') as tsv:
         i = 0
-        sorted_keys = sorted(dict.keys())
-        for key in sorted_keys:
-          final_dict[key] = {}
-          for result_key in ['name', 'number_of_reads', 'mean_read_length', 'mean_qual', 'total_illumina_reads', 'nanopore_illumina_mash_distance', 'assemblers']:
-            final_dict[key][result_key] = dict[key][result_key]
-          
-          results = ['total_length', 'num_contigs', 'circ_contigs', 'coverage', 'unmapped_nanopore', 'unmapped_nanopore_pc', 'unmapped_illumina', 'unmapped_illumina_pc']
+        for sample in sorted_keys:
+          for key in unique_key:
+            if key not in final_results_dict[sample].keys():
+              final_results_dict[sample][key] = ""
 
-          for assembler in ['flye', 'raven']:
-            if assembler in dict[key]['assemblers'].replace('dragonflye','dragon'):
-              if assembler in dict[key].keys():
-                for result in results + ['busco']:
-                  final_dict[key][assembler + '_' + result] = dict[key][assembler][result]
-                final_dict[key][assembler + '_busco_polished'] = dict[key][assembler]['busco_pypolca']
-                final_dict[key][assembler + '_quality_before_polishing'] = dict[key][assembler]['Consensus_Quality_Before_Polishing']
-                final_dict[key][assembler + '_QV_before_polishing'] = dict[key][assembler]['Consensus_QV_Before_Polishing']
-              else:
-                for result in results + ['quality_before_polishing', 'QV_before_polishing' ]:
-                  final_dict[key][assembler + '_' + result] = 0
+          final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-                for result in ['busco', 'busco_polished']:
-                  final_dict[key][assembler + '_' + result] = 'NF'
-
-          if 'unicycler' in dict[key]['assemblers']:
-            if 'unicycler' in dict[key].keys():
-              for result in results + [ 'busco']:
-                final_dict[key]['unicycler_' + result] = dict[key]['unicycler'][result]
-            else:
-              for result in results:
-                final_dict[key]['unicycler_' + result] = 0
-              final_dict[key]['unicycler_busco'] = 'NF'
-
-          w = csv.DictWriter(tsv, final_dict[key].keys(), delimiter='\\t')
+          w = csv.DictWriter(tsv, final_results_dict[sample].keys(), delimiter='\\t')
           if i < 1 :
             w.writeheader()
-            i = i+1
-          w.writerow(final_dict[key])
+            i += 1
+          w.writerow(final_results_dict[sample])
 
   def main():
-      if exists('nanoplot_summary.csv') :
-        nanoplot_dict = file_to_dict('nanoplot_summary.csv', 'sample', ',')
-      else:
-        nanoplot_dict = {}
 
-      if exists('mash_summary.tsv') :
-        mash_dict = mash_file('mash_summary.tsv')
-      else:
-        mash_dict = {}
+      seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
+      
+      if not seqkit_dict:
+        print('FATAL : Something is wrong and seqkit results were not located.')
+        exit(1)
 
-      if exists('pypolca_summary.tsv') :
-        pypolca_dict  = file_to_dict('pypolca_summary.tsv', 'sample', '\t')
-      else:
-        pypolca_dict = {}
-
-      if exists('gfastats_summary.csv') :
-        gfastats_dict = file_to_dict_uniq('gfastats_summary.csv', 'sample', 'Header', ',')
-      else:
-        gfastats_dict = {}
-
-      busco_dict = busco_results()
-
+      mash_dict       = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
+      pypolca_dict    = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
+      gfastats_dict   = gfastats_file('gfastats_summary.csv') if exists('gfastats_summary.csv') else {}
+      busco_dict      = busco_results()
       circulocov_dict = circulocov_results()
 
-      final_results = {}
-      assemblers = ['dragonflye', 'flye', 'hybracter', 'raven', 'unicycler']
-      for key in nanoplot_dict.keys():
-
-        if key.endswith('_illumina'):
-          actual_key = key.replace('_illumina', '')
-          if actual_key not in final_results.keys():
-            final_results[actual_key] = {}
-          final_results[actual_key]['total_illumina_reads'] = int(nanoplot_dict[key]['number_of_reads'])
-        else:
-          if key not in final_results.keys():
-            final_results[key] = {}
-
-          if 'total_illumina_reads' not in final_results[key].keys():
-            final_results[key]['total_illumina_reads'] = 0
-
-          final_results[key]['name'] = key
-
-          # from nanostas
-          final_results[key]['number_of_reads']  = int(nanoplot_dict[key]['number_of_reads'])
-          final_results[key]['mean_read_length'] = float(nanoplot_dict[key]['mean_read_length'])
-          final_results[key]['mean_qual']        = float(nanoplot_dict[key]['mean_qual'])
-
-          # from mash
-          if key in mash_dict.keys():
-            final_results[key]['nanopore_illumina_mash_distance'] = float(mash_dict[key]['dist'])
-          else:
-            final_results[key]['nanopore_illumina_mash_distance'] = 'NF'
-
-          final_results[key]['assemblers'] = '${params.assembler}'
-
-          # for each assembler
-          for assembler in assemblers:
-            if key + '_' + assembler in gfastats_dict.keys():
-              final_results[key][assembler] = {}
-              final_results[key][assembler]['assembler'] = assembler
-
-              # gfastats results
-              total_length = 0
-              num_circular = 0
-              for contig in gfastats_dict[key + '_' + assembler].keys():
-                total_length = total_length + int(gfastats_dict[key + '_' + assembler][contig]['Total segment length'])
-                if gfastats_dict[key + '_' + assembler][contig]['Is circular'] == 'Y':
-                  num_circular = num_circular + 1
-
-              final_results[key][assembler]['total_length'] = total_length
-              final_results[key][assembler]['num_contigs']  = len(gfastats_dict[key + '_' + assembler].keys())
-              final_results[key][assembler]['circ_contigs'] = num_circular
-
-              # circulocov results
-              if key + '_' + assembler in circulocov_dict.keys():
-                if 'coverage' in circulocov_dict[key + '_' + assembler].keys():
-                  final_results[key][assembler]['coverage']          = float(circulocov_dict[key + '_' + assembler]['coverage'])
-                else:
-                  final_results[key][assembler]['coverage']          = 'NF'
-
-                if 'unmapped_nanopore' in circulocov_dict[key + '_' + assembler].keys():
-                  final_results[key][assembler]['unmapped_nanopore']    = int(circulocov_dict[key + '_' + assembler]['unmapped_nanopore'])
-                  final_results[key][assembler]['unmapped_nanopore_pc'] = float('{:.2f}'.format(int(final_results[key][assembler]['unmapped_nanopore']) / int(nanoplot_dict[key]['number_of_reads']) * 100))
-                else:
-                  final_results[key][assembler]['unmapped_nanopore']    = 'NF'
-                  final_results[key][assembler]['unmapped_nanopore_pc'] = 'NF'
-
-                if 'unmapped_illumina' in circulocov_dict[key + '_' + assembler].keys():
-                  final_results[key][assembler]['unmapped_illumina'] = int(circulocov_dict[key + '_' + assembler]['unmapped_illumina'])
-                  if 'total_illumina_reads' in final_results[key].keys() and final_results[key]['total_illumina_reads'] > 0:
-                    final_results[key][assembler]['unmapped_illumina_pc'] = float('{:.2f}'.format(int(final_results[key][assembler]['unmapped_illumina']) / int(final_results[key]['total_illumina_reads']) * 100 ))
-                  else:
-                    final_results[key][assembler]['unmapped_illumina_pc'] = 0.0
-                else:
-                  final_results[key][assembler]['unmapped_illumina'] = 'NF'
-                  final_results[key][assembler]['unmapped_illumina_pc'] = 'NF'
-
-              # busco results
-              if key + '_' + assembler in busco_dict.keys():
-                final_results[key][assembler]['busco'] = busco_dict[key + '_' + assembler]
-              elif key + '_' + assembler + '_reoriented' in busco_dict.keys():
-                final_results[key][assembler]['busco'] = busco_dict[key + '_' + assembler + '_reoriented']
-              else:
-                final_results[key][assembler]['busco'] = 'NF'
-
-              if assembler != 'unicycler':
-                for step in ['polypolish', 'pypolca', 'medaka']:
-                  if key + '_' + assembler + '_' + step in busco_dict.keys():
-                    final_results[key][assembler]['busco_' + step ] = busco_dict[key + '_' + assembler + '_' + step]
-                  else:
-                    final_results[key][assembler]['busco_' + step ] = 'NF'
-
-              # pypolca results
-              if key + '_' + assembler in pypolca_dict.keys():
-                if 'Consensus_Quality_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
-                  final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = float(pypolca_dict[key + '_' + assembler]['Consensus_Quality_Before_Polishing'])
-                else:
-                  final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 'NF'
-                if 'Consensus_QV_Before_Polishing' in pypolca_dict[key + '_' + assembler].keys():
-                  final_results[key][assembler]['Consensus_QV_Before_Polishing']      = float(pypolca_dict[key + '_' + assembler]['Consensus_QV_Before_Polishing'])
-                else:
-                  final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 'NF'
-
-              elif assembler != 'unicycler':
-                final_results[key][assembler]['Consensus_Quality_Before_Polishing'] = 0.0
-                final_results[key][assembler]['Consensus_QV_Before_Polishing']      = 0.0
+      final_results   = combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict)
 
       final_file(final_results)
       tsv_file(final_results)
@@ -1520,7 +1338,7 @@ process unicycler {
   tag           "${meta.id}"
   label         'process_high'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/unicycler:0.5.0'
+  container     'staphb/unicycler:0.5.1'
   time          '10h'
 
   input:
@@ -1535,7 +1353,7 @@ process unicycler {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   def args   = task.ext.args   ?: ''
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
@@ -1560,7 +1378,7 @@ process versions {
   tag           "extracting versions"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.25'
+  container     'staphb/multiqc:1.28'
   time          '30m'
   
   input:
@@ -1573,6 +1391,7 @@ process versions {
   when:
   task.ext.when == null || task.ext.when
 
+  script:
   """
   #!/usr/bin/env python3
 
@@ -1658,6 +1477,42 @@ process versions {
   """
 }
 
+// TODO : Add seqkit watch for visualizations
+// process watch {
+//   tag           "${meta.id}"
+//   label         "process_low"
+//   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+//   container     'staphb/seqkit:2.10.0'
+//   time          '10m'
+
+//   input:
+//   file(fastq)
+
+//   output:
+//   path("seqkit/*.tsv"), emit: stats
+//   path("seqkit/*hist"), emit: histogram
+//   path "versions.yml", emit: versions
+
+//   when:
+//   task.ext.when == null || task.ext.when
+
+//   script:
+//   def args   = task.ext.args   ?: '--all'
+//   def prefix = task.ext.prefix ?: ""
+//   """
+//   mkdir -p seqkit
+
+//   seqkit watch -p 500 --fields ReadLen *.fastq.gz -y -B 50
+
+//   cat <<-END_VERSIONS > versions.yml
+//   "${task.process}":
+//     seqkit: \$(seqkit version | sed 's/v//g' | awk '{print \$NF}')
+//   END_VERSIONS
+
+//   exit 1
+//   """  
+// }
+
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
 // Downloading files for testing
@@ -1668,7 +1523,7 @@ process test {
   tag           "Downloading R10.4 reads"
   label         "process_low"
   publishDir    "${params.outdir}/test_files/", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/gfastats:1.3.7'
+  container     'staphb/gfastats:1.3.10'
   time          '1h'
 
   output:
@@ -1677,7 +1532,7 @@ process test {
   when:
   task.ext.when == null || task.ext.when
 
-  shell:
+  script:
   """
   wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
   tar -xvf dataset.tar.gz
@@ -1697,17 +1552,27 @@ workflow DONUT_FALLS {
 
   main:
     // channel for gfa files for gfa stats
-    ch_gfa       = Channel.empty()
+    ch_gfa           = Channel.empty()
     // channel for files for multiqc or workflow summary
-    ch_summary   = Channel.empty()
-    // channel for assembled genomes
-    ch_consensus = Channel.empty()
+    ch_summary       = Channel.empty()
+    // channel for all assembled genomes at all phases
+    ch_consensus     = Channel.empty()
+    // channel for de novo assembled genomes after reorienting
+    ch_reoriented    = Channel.empty()
+    // channel for de novo assembled genomes after clair3 polishing
+    ch_clair3_fa     = Channel.empty()
+    // channel for de novo assembled genomes after polypolish polishing
+    ch_polypolish_fa = Channel.empty()
+    // channel for de novo assembled genomes after pypolca polishing
+    ch_pypolca_fa    = Channel.empty()
+    // channel for hybrid assembled genomes with unicycler
+    ch_unicycler_fa  = Channel.empty()
     // versions channel
-    ch_versions  = Channel.empty()
+    ch_versions      = Channel.empty()
 
+    // get the mash distance between illumina and nanopore reads
+    // this is helpful because these should be very close
     mash(ch_illumina_input.join(ch_nanopore_input, by: 0, remainder: false))
-
-    ch_versions = ch_versions.mix(mash.out.versions)
 
     mash.out.txt
       .collectFile(
@@ -1718,6 +1583,21 @@ workflow DONUT_FALLS {
       .set { mash_summary }
 
     ch_summary  = ch_summary.mix(mash_summary)
+    ch_versions = ch_versions.mix(mash.out.versions.first())
+
+    // general qc information
+    seqkit(ch_nanopore_input.mix(ch_illumina_input.transpose()).groupTuple().filter{it})
+
+    seqkit.out.stats
+      .collectFile(
+        storeDir: "${params.outdir}/summary/",
+        keepHeader: true,
+        sort: { file -> file.text },
+        name: "seqkit_summary.tsv")
+      .set { seqkit_summary }
+
+    ch_summary = ch_summary.mix(seqkit_summary)
+    ch_versions = ch_versions.mix(seqkit.out.versions)
 
     ch_illumina_input
       .join(mash.out.dist, by: 0)
@@ -1728,21 +1608,22 @@ workflow DONUT_FALLS {
     if (params.assembler =~ /unicycler/ ) {
       unicycler(ch_dist_filter.join(ch_nanopore_input, by: 0, remainder: false))
       
-      ch_gfa       = ch_gfa.mix(unicycler.out.gfa)
+      ch_gfa          = ch_gfa.mix(unicycler.out.gfa)
       // no ch_summary
-      ch_consensus = ch_consensus.mix(unicycler.out.fasta)
-      ch_versions  = ch_versions.mix(unicycler.out.versions.first())
+      ch_consensus    = ch_consensus.mix(unicycler.out.fasta)
+      ch_unicycler_fa = ch_unicycler_fa.mix(unicycler.out.fasta)
+      ch_versions     = ch_versions.mix(unicycler.out.versions.first())
     }
 
-    if (params.assembler.replaceAll('dragonflye','dragon') =~ /flye/ || params.assembler =~ /raven/ ) {
+    if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
       // quality filter
 
       fastp(ch_dist_filter.map { it -> [it[0], it[1]]}.filter{it[0]})
-      ch_versions = ch_versions.mix(fastp.out.versions)
+      ch_versions = ch_versions.mix(fastp.out.versions.first())
       ch_summary  = ch_summary.mix(fastp.out.summary)
 
       fastplong(ch_nanopore_input.map { it -> [it[0], it[1]]})
-      ch_versions = ch_versions.mix(fastplong.out.versions)
+      ch_versions = ch_versions.mix(fastplong.out.versions.first())
       ch_summary  = ch_summary.mix(fastplong.out.summary)
 
       rasusa(fastplong.out.fastq)
@@ -1757,7 +1638,14 @@ workflow DONUT_FALLS {
         // no ch_consensus
         ch_versions = ch_versions.mix(raven.out.versions.first())
       }
-      
+
+      // if (params.assembler =~ /myloasm/ ) {
+      //   myloasm(rasusa.out.fastq)
+        
+      //   ch_gfa      = ch_gfa.mix(myloasm.out.gfa)
+      //   ch_versions = ch_versions.mix(myloasm.out.versions.first())
+      // }
+
       if (params.assembler =~ /flye/ ) {
         flye(rasusa.out.fastq)
 
@@ -1777,6 +1665,8 @@ workflow DONUT_FALLS {
     }
 
     bandage(ch_gfa)
+    ch_versions = ch_versions.mix(bandage.out.versions.first())
+
     gfastats(ch_gfa)
 
     gfastats.out.summary
@@ -1787,64 +1677,92 @@ workflow DONUT_FALLS {
         name: "gfastats_summary.csv")
       .set { gfastats_summary }
 
-    ch_versions = ch_versions.mix(bandage.out.versions).mix(gfastats.out.versions)
+    ch_versions = ch_versions.mix(gfastats.out.versions.first())
     ch_summary  = ch_summary.mix(gfastats_summary)
 
-    if (params.assembler.replaceAll('dragonflye','dragon') =~ /flye/ || params.assembler =~ /raven/ ) {
+    if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
       gfa_to_fasta(gfastats.out.stats.filter { it -> !(it[1] =~ /unicycler/ )} )
 
-      dnaapler(gfa_to_fasta.out.fasta)
+      sort(gfa_to_fasta.out.fasta)
+      ch_versions = ch_versions.mix(sort.out.versions)
 
+      dnaapler(sort.out.fasta)
       ch_versions = ch_versions.mix(dnaapler.out.versions)
 
-      dnaapler.out.fasta
+      ch_consensus  = ch_consensus.mix(dnaapler.out.fasta)
+      ch_reoriented = ch_reoriented.mix(dnaapler.out.fasta)
+    }
+
+    ch_reoriented
+      .branch {
+        myloasm: it =~ /myloasm/
+        raven: it =~ /raven/
+        flye: it =~ /flye/
+      }
+      .set { ch_reoriented_out }
+
+    ch_reoriented_out.flye
+      .join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true)
+      .mix(ch_reoriented_out.raven.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
+      .mix(ch_unicycler_fa.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
+      .filter{ it -> if (it) {it[1]}}
+      .set{ch_assembly_reads}
+
+    circulocov(ch_assembly_reads)
+
+    circulocov.out.summary
+      .collectFile(name: "circulocov_summary.txt",
+        keepHeader: true,
+        storeDir: "${params.outdir}/summary")
+      .set { circulocov_summary }
+
+    ch_versions = ch_versions.mix(circulocov.out.versions)
+    ch_summary = ch_summary.mix(circulocov.out.summary)
+
+    if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
+      clair3(circulocov.out.bam.filter { it -> !(it[1] =~ /unicycler/ )} )
+      ch_versions = ch_versions.mix(clair3.out.versions.first())
+
+      bcftools(clair3.out.vcf)
+      ch_versions = ch_versions.mix(bcftools.out.versions)
+      ch_consensus = ch_consensus.mix(bcftools.out.fasta)
+
+      ch_clair3_fa = ch_clair3_fa.mix(bcftools.out.fasta)
+
+      ch_clair3_fa
         .branch {
-          dragonflye: it =~ /dragonflye/
+          myloasm: it =~ /myloasm/
           raven: it =~ /raven/
           flye: it =~ /flye/
         }
-        .set { ch_dnaapler_out }
+        .set { ch_clair3_out }   
 
-      ch_dnaapler_out.flye
-        .join(ch_nanopore_input, by:0, remainder: false)
-        .mix(ch_dnaapler_out.raven.join(ch_nanopore_input, by:0, remainder: false))
-        .set { ch_reoriented }
-
-      medaka(ch_reoriented)
-
-      ch_versions = ch_versions.mix(medaka.out.versions)
-
-      medaka.out.fasta
-        .branch {
-          dragonflye: it =~ /dragonflye/
-          raven: it =~ /raven/
-          flye: it =~ /flye/
-        }
-        .set { ch_medaka_out }   
-
-      ch_medaka_out.flye
+      ch_clair3_out.flye
         .join(ch_dist_filter, by:0, remainder: false)
-        .mix(ch_medaka_out.raven.join(ch_dist_filter, by:0, remainder: false))
-        .set { ch_medaka_polished }  
+        .mix(ch_clair3_out.raven.join(ch_dist_filter, by:0, remainder: false))
+        .set { ch_clair3_polished }
 
-      bwa(ch_medaka_polished)
+      bwa(ch_clair3_polished)
+      ch_versions = ch_versions.mix(bwa.out.versions.first())
+
       polypolish(bwa.out.sam)
-
-      ch_versions = ch_versions.mix(bwa.out.versions).mix(polypolish.out.versions)
+      ch_versions = ch_versions.mix(polypolish.out.versions.first())
+      ch_polypolish_fa = ch_polypolish_fa.mix(polypolish.out.fasta)
+      ch_consensus = ch_consensus.mix(ch_polypolish_fa)
 
       polypolish.out.fasta
-        .branch {
-          dragonflye: it =~ /dragonflye/
-          raven: it =~ /raven/
-          flye: it =~ /flye/
-        }
-        .set { ch_polypolish_out }   
+          .branch {
+            myloasm: it =~ /myloasm/
+            raven: it =~ /raven/
+            flye: it =~ /flye/
+          }
+          .set { ch_polypolish_out }   
 
       ch_polypolish_out.flye
         .join(ch_dist_filter, by:0, remainder: false)
         .mix(ch_polypolish_out.raven.join(ch_dist_filter, by:0, remainder: false))
         .set { ch_polypolish_polished }
-           
+            
       pypolca(ch_polypolish_polished)
 
       pypolca.out.summary
@@ -1857,58 +1775,17 @@ workflow DONUT_FALLS {
       ch_summary = ch_summary.mix(pypolca_summary)
       ch_versions = ch_versions.mix(pypolca.out.versions)
     
-      ch_consensus = ch_consensus.mix(dnaapler.out.fasta).mix(medaka.out.fasta).mix(polypolish.out.fasta).mix(pypolca.out.fasta)
+      ch_consensus = ch_consensus.mix(pypolca.out.fasta)
+      ch_pypolca_fa = ch_pypolca_fa.mix(pypolca.out.fasta)
     }
-
-    nanoplot(ch_nanopore_input.mix(ch_illumina_input.filter{it[1]}))
-
-    nanoplot.out.summary
-      .collectFile(name: "nanoplot_summary.csv",
-        keepHeader: true,
-        storeDir: "${params.outdir}/summary")
-      .set { nanostats_summary }
-
-    ch_summary = ch_summary.mix(nanostats_summary).mix(nanoplot.out.stats)
-    ch_versions = ch_versions.mix(nanoplot.out.versions)
 
     busco(ch_consensus)
 
     ch_summary = ch_summary.mix(busco.out.summary)
     ch_versions = ch_versions.mix(busco.out.versions.first())
 
-    ch_consensus
-      .filter{ it -> !(it[1] =~ /pypolca/ )}
-      .filter{ it -> !(it[1] =~ /medaka/ )}
-      .filter{ it -> !(it[1] =~ /poylpolish/ )}
-      .branch {
-        dragonflye: it =~ /dragonflye/
-        raven: it =~ /raven/
-        flye: it =~ /flye/
-        unicycler: it =~ /unicycler/
-      }
-      .set { ch_assemblies }
-
-    ch_assemblies.dragonflye
-      .join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true)
-      .mix(ch_assemblies.flye.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
-      .mix(ch_assemblies.unicycler.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
-      .mix(ch_assemblies.raven.join(ch_nanopore_input, by: 0 , remainder: false).join(ch_dist_filter, by: 0, remainder: true))
-      .filter{ it -> if (it) {it[1]}}
-      .set{ch_assembly_reads}
-
     png(bandage.out.png.groupTuple(by:0))
     ch_summary = ch_summary.mix(png.out.png)
-
-    circulocov(ch_assembly_reads)
-
-    circulocov.out.summary
-      .collectFile(name: "circulocov_summary.txt",
-        keepHeader: true,
-        storeDir: "${params.outdir}/summary")
-      .set { circulocov_summary }
-
-    ch_versions = ch_versions.mix(circulocov.out.versions)
-    ch_summary = ch_summary.mix(circulocov.out.summary)
 
     ch_versions
       .collectFile(
@@ -1923,14 +1800,17 @@ workflow DONUT_FALLS {
 
     multiqc(ch_summary.unique().collect())
 
-    ch_consensus
-      .combine(circulocov_summary)
-      .combine(gfastats_summary)
-      .set { ch_fasta_info }
+    copy(ch_consensus.combine(gfastats_summary))
 
-    copy(ch_fasta_info)
   emit:
-    fasta = ch_consensus
+    gfa              = ch_gfa
+    consensus        = ch_consensus
+    reoriented       = ch_reoriented
+    clair3_polished  = ch_clair3_fa
+    polypolished     = ch_polypolish_fa
+    pypolca_polished = ch_pypolca_fa
+    unicycler        = ch_unicycler_fa
+    versions         = ch_versions
 }
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
@@ -1947,7 +1827,7 @@ workflow {
 
     test.out.fastq
       .map { it ->
-        meta = [id:it[0]] 
+        def meta = [id:it[0]] 
         tuple( meta,
           file("${it[1]}", checkIfExists: true),
           [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
@@ -1967,10 +1847,6 @@ workflow {
     ch_illumina_input = ch_illumina_input.mix(ch_test_illumina)
   }
 
-  if (params.sequencing_summary) {
-    nanoplot_summary(ch_sequencing_summary)
-  }
-
   DONUT_FALLS(ch_nanopore_input, ch_illumina_input.ifEmpty([]))
 }
 
@@ -1978,6 +1854,6 @@ workflow.onComplete {
   println("Pipeline completed at: $workflow.complete")
   println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
   println("The consensus fasta files can be found in ${params.outdir}/sample/consensus")
-  println("The fasta files are from each phase of assembly: unpolished -> medaka -> polypolish (if illumina reads are supplied) -> polca")
+  println("The fasta files are from each phase of assembly: unpolished/reoriented -> clair3 -> polypolish (if illumina reads are supplied) -> pypolca")
   println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
 }
