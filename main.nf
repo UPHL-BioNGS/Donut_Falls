@@ -988,7 +988,7 @@ process seqkit {
   time          '10m'
 
   input:
-  tuple val(meta), file(nanopore), file(illumina)
+  tuple val(meta), file(fastq)
 
   output:
   path("seqkit/*seqkit_stats.tsv"), emit: stats
@@ -1000,7 +1000,7 @@ process seqkit {
   script:
   def args   = task.ext.args   ?: '--all'
   def prefix = task.ext.prefix ?: "${meta.id}"
-  def ill_rds = (illumina[1] =~ /input/) ? "" : "${illumina.join(' ')}"
+  def ill_rds = fastq[1] ? "${fastq[1]} ${fastq[2]}" : ""
   """
   mkdir -p seqkit
 
@@ -1008,9 +1008,9 @@ process seqkit {
     ${args} \
     --tabular \
     --threads ${task.cpus} \
-    ${nanopore} \
+    ${fastq[0]} \
     ${ill_rds} | \
-    awk '{print "${prefix}\t" \$0}' | \
+    awk '{print "${prefix}\\t" \$0}' | \
     sed 's/${prefix}\\tfile/sample\\tfile/g' > \
     seqkit/${prefix}_seqkit_stats.tsv
 
@@ -1586,7 +1586,7 @@ workflow DONUT_FALLS {
     ch_versions = ch_versions.mix(mash.out.versions.first())
 
     // general qc information
-    seqkit(ch_nanopore_input.mix(ch_illumina_input).groupTuple().map{ it -> tuple(it[0], it[1][0], it[1][1])})
+    seqkit(ch_nanopore_input.mix(ch_illumina_input.transpose()).groupTuple().filter{it})
 
     seqkit.out.stats
       .collectFile(
