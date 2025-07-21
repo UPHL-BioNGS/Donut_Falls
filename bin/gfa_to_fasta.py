@@ -11,7 +11,7 @@ def convert_to_fasta(summary_dict, gfa_file):
                 header = parts[1]
                 seq = parts[2]
                 if header in summary_dict.keys():
-                    new_header = ">" + header + " length=" + summary_dict[header]['Total segment length'] + " circular=" + summary_dict[header]["Is circular"].replace("N","false").replace("Y","true") + " gc_per=" + summary_dict[header]["GC content %"] + "\\n"
+                    new_header = f">{header} length={summary_dict[header]['Total segment length']} circular={summary_dict[header]["Is circular"].replace("N","false").replace("Y","true")} gc_per={summary_dict[header]["GC content %"]}\\n"
                     with open(outfile, mode='a') as output_file:
                         output_file.write(new_header)
                         output_file.write(seq + "\\n")
