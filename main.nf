@@ -385,10 +385,10 @@ def sub_fasta(fasta):
               for line in file:
                   line = line.strip()
                   if line.startswith('>') and i < 1:
-                      outfile.write(f">{line.split()[0]} [location=chromosome][topology=circular][completeness=complete]\\n")
+                      outfile.write(f"{line.split()[0]} [location=chromosome][topology=circular][completeness=complete]\\n")
                       i += 1
                   elif line.startswith('>') and i >= 1:
-                      outfile.write(f">{line.split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n")
+                      outfile.write(f"{line.split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n")
                   else:
                       outfile.write(f"{line}\\n")
 
@@ -643,10 +643,10 @@ process gfa_to_fasta {
                   header = parts[1]
                   seq = parts[2]
                   if header in summary_dict.keys():
-                      new_header = ">" + header + " length=" + summary_dict[header]['Total segment length'] + " circular=" + summary_dict[header]["Is circular"].replace("N","false").replace("Y","true") + " gc_per=" + summary_dict[header]["GC content %"] + "\\n"
+                      new_header = f">{header} length={summary_dict[header]['Total segment length']} circular={summary_dict[header]['Is circular'].replace('N','false').replace('Y','true')} gc_per={summary_dict[header]['GC content %']}\\n"
                       with open(outfile, mode='a') as output_file:
                           output_file.write(new_header)
-                          output_file.write(seq + "\\n")
+                          output_file.write(f"{seq}\\n")
 
   def read_summary_csv(gfastats_file):
       summary_dict = {}
@@ -657,7 +657,7 @@ process gfa_to_fasta {
               summary_dict[key] = row
               with open("noncircular.txt", mode='a') as output_file:
                   if summary_dict[key]["Is circular"] == "N":
-                      output_file.write(key + "\\n")
+                      output_file.write(f"{key}\\n")
       return summary_dict
 
   gfastats_file = glob.glob("*_gfastats_summary.csv")
@@ -673,7 +673,7 @@ process gfa_to_fasta {
 process mash {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "mash/*.mashdist.txt"
   container     'staphb/mash:2.3'
   time          '30m'
   
@@ -681,7 +681,7 @@ process mash {
   tuple val(meta), file(illumina), file(nanopore)
 
   output:
-  tuple val(meta), env("dist"), optional: true, emit: dist
+  tuple val(meta), file("*.head.mashdist.txt"), optional: true, emit: dist
   path "mash/*", optional: true, emit: txt
   path "versions.yml", emit: versions
   
@@ -711,7 +711,7 @@ process mash {
       awk -v prefix=${prefix} '{print prefix "\\t" \$0 }' \
       > mash/${prefix}.mashdist.txt
 
-  dist=\$(head -n 1 mash/${prefix}.mashdist.txt | awk '{print \$4}')
+  head -n 1 mash/${prefix}.mashdist.txt > ${prefix}.head.mashdist.txt
 
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
@@ -1106,9 +1106,9 @@ process summary {
 
   def circulocov_results():
       results = {}
-      files = glob.glob('*overall_summary.txt')
+      files = glob.glob('*_reoriented_overall_summary.txt') + glob.glob('*_unicycler_overall_summary.txt')
       for file in files:
-        sample, assembler = file.replace('_reoriented_overall_summary.txt','').rsplit("_", 1)
+        sample, assembler = file.replace('_reoriented', '').replace('_overall_summary.txt','').rsplit("_", 1)
         if sample not in results.keys():
           results[sample] = {}
         if assembler not in results[sample].keys():
@@ -1120,7 +1120,6 @@ process summary {
             results[sample][assembler][row['contigs']] = row
 
         results[sample][assembler]['all']['warnings'] = ""
-
 
         results[sample][assembler]['all']['unmapped_nanopore'] = results[sample][assembler]['missing']['nanopore_numreads'] if 'nanopore_numreads' in results[sample][assembler]['missing'].keys() else 0
         results[sample][assembler]['all']['unmapped_nanopore_pc'] = round(float(results[sample][assembler]['all']['unmapped_nanopore']) / float(results[sample][assembler]['all']['nanopore_numreads']), 2)
@@ -1155,7 +1154,7 @@ process summary {
             final_results[key]['circulocov'] = circulocov_dict[key]
 
           final_results[key]['assemblers'] = "${params.assembler}"
-        
+
         return final_results
           
   def final_file(results):
@@ -1303,11 +1302,63 @@ process summary {
 
           final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-          w = csv.DictWriter(tsv, final_results_dict[sample].keys(), delimiter='\\t')
+          possible_fieldnames = [
+            "sample",
+            "seqkit_num_seqs",
+            "seqkit_avg_len",
+            "seqkit_AvgQual",
+            "seqkit_GC(%)",
+            "mash_dist",
+            "flye_gfastats_total_length",
+            "flye_gfastats_num_contigs",
+            "flye_gfastats_circ_contigs",
+            "flye_circulocov_nanopore_meandepth",
+            "flye_circulocov_unmapped_nanopore_pc",
+            "flye_circulocov_illumina_meandepth",
+            "flye_circulocov_unmapped_illumina_pc",
+            "flye_circulocov_warnings",
+            "flye_busco_reoriented",
+            "flye_busco_clair3",
+            "flye_busco_polypolish",
+            "flye_busco_pypolca",
+            "flye_pypolca_Insertion/Deletion_Errors_Found",
+            "flye_pypolca_Substitution_Errors_Found",
+            "raven_gfastats_total_length",
+            "raven_gfastats_num_contigs",
+            "raven_gfastats_circ_contigs",
+            "raven_circulocov_nanopore_meandepth",
+            "raven_circulocov_unmapped_nanopore_pc",
+            "raven_circulocov_illumina_meandepth",
+            "raven_circulocov_unmapped_illumina_pc",
+            "raven_circulocov_warnings",
+            "raven_busco_reoriented",
+            "raven_busco_clair3",
+            "raven_busco_polypolish",
+            "raven_busco_pypolca",
+            "raven_pypolca_Insertion/Deletion_Errors_Found",
+            "raven_pypolca_Substitution_Errors_Found",
+            "unicycler_gfastats_total_length",
+            "unicycler_gfastats_num_contigs",
+            "unicycler_gfastats_circ_contigs",
+            "unicycler_circulocov_nanopore_meandepth",
+            "unicycler_circulocov_unmapped_nanopore_pc",
+            "unicycler_circulocov_illumina_meandepth",
+            "unicycler_circulocov_unmapped_illumina_pc",
+            "unicycler_circulocov_warnings",
+            "unicycler_busco_unicycler"
+          ]
+
+          fieldnames = []
+          for name in possible_fieldnames:
+            if name in final_results_dict[sample].keys():
+              fieldnames.append(name)
+
+          w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\\t')
           if i < 1 :
             w.writeheader()
             i += 1
-          w.writerow(final_results_dict[sample])
+          filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
+          w.writerow(filtered_row)
 
   def main():
 
@@ -1582,6 +1633,11 @@ workflow DONUT_FALLS {
         name: "mash_summary.tsv")
       .set { mash_summary }
 
+    mash.out.dist
+      .splitCsv(sep: '\t')
+      .map { it -> tuple(it[0], it[1][3]) }
+      .set {ch_mash_dist}
+
     ch_summary  = ch_summary.mix(mash_summary)
     ch_versions = ch_versions.mix(mash.out.versions.first())
 
@@ -1600,7 +1656,7 @@ workflow DONUT_FALLS {
     ch_versions = ch_versions.mix(seqkit.out.versions)
 
     ch_illumina_input
-      .join(mash.out.dist, by: 0)
+      .join(ch_mash_dist, by: 0)
       .filter{it[2] as float < 0.5}
       .map{it -> tuple(it[0], it[1])}
       .set {ch_dist_filter}
