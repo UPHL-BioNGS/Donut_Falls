@@ -450,7 +450,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:0.24.1'
+  container     'staphb/fastp:1.0.1'
 
   input:
   tuple val(meta), file(reads)
@@ -573,7 +573,7 @@ process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "gfastats/*"
-  container     'staphb/gfastats:1.3.10'
+  container     'staphb/gfastats:1.3.11'
   time          '10m'
 
   input:
@@ -1119,18 +1119,13 @@ process summary {
           for row in reader:
             results[sample][assembler][row['contigs']] = row
 
-        results[sample][assembler]['all']['warnings'] = ""
-
         results[sample][assembler]['all']['unmapped_nanopore'] = results[sample][assembler]['missing']['nanopore_numreads'] if 'nanopore_numreads' in results[sample][assembler]['missing'].keys() else 0
         results[sample][assembler]['all']['unmapped_nanopore_pc'] = round(float(results[sample][assembler]['all']['unmapped_nanopore']) / float(results[sample][assembler]['all']['nanopore_numreads']), 2)
-        if results[sample][assembler]['all']['unmapped_nanopore_pc'] > 0.1:
-          results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Nanopore reads,"
 
         if 'illumina_numreads' in results[sample][assembler]['missing'].keys():
           results[sample][assembler]['all']['unmapped_illumina'] = results[sample][assembler]['missing']['illumina_numreads']
           results[sample][assembler]['all']['unmapped_illumina_pc'] = round(float(results[sample][assembler]['all']['unmapped_illumina']) / float(results[sample][assembler]['all']['illumina_numreads']), 2)
-          if results[sample][assembler]['all']['unmapped_illumina_pc'] > 0.1:
-            results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Illumina reads,"
+
       return results
 
   def combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict):
@@ -1316,7 +1311,6 @@ process summary {
             "flye_circulocov_unmapped_nanopore_pc",
             "flye_circulocov_illumina_meandepth",
             "flye_circulocov_unmapped_illumina_pc",
-            "flye_circulocov_warnings",
             "flye_busco_reoriented",
             "flye_busco_clair3",
             "flye_busco_polypolish",
@@ -1330,7 +1324,6 @@ process summary {
             "raven_circulocov_unmapped_nanopore_pc",
             "raven_circulocov_illumina_meandepth",
             "raven_circulocov_unmapped_illumina_pc",
-            "raven_circulocov_warnings",
             "raven_busco_reoriented",
             "raven_busco_clair3",
             "raven_busco_polypolish",
@@ -1344,7 +1337,6 @@ process summary {
             "unicycler_circulocov_unmapped_nanopore_pc",
             "unicycler_circulocov_illumina_meandepth",
             "unicycler_circulocov_unmapped_illumina_pc",
-            "unicycler_circulocov_warnings",
             "unicycler_busco_unicycler"
           ]
 
