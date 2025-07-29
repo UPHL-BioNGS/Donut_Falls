@@ -389,6 +389,7 @@ def sub_fasta(fasta):
                       i += 1
                   elif line.startswith('>') and i >= 1:
                       outfile.write(f"{line.split()[0]} [plasmid-name=unnamed{i}][topology=circular][completeness=complete]\\n")
+                      i += 1
                   else:
                       outfile.write(f"{line}\\n")
 
