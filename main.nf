@@ -191,7 +191,7 @@ process busco {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/busco:5.8.2-prok-bacteria_odb12_2024-11-14'
+  container     'staphb/busco:6.0.0-prok-bacteria_odb12_2024-11-14'
   time          '45m'
 
   input:
