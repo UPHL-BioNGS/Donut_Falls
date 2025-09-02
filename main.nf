@@ -206,7 +206,7 @@ process busco {
   task.ext.when == null || task.ext.when
 
   script:
-  def args   = task.ext.args   ?: '--offline -l /busco_downloads/lineages/bacteria_odb10'
+  def args   = task.ext.args   ?: '--offline -l /busco_downloads/lineages/bacteria_odb12'
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   """
   busco ${args} \
