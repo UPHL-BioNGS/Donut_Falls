@@ -305,7 +305,7 @@ process clair3 {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "clair3/*"
-  container     'staphb/clair3:1.1.0'
+  container     'staphb/clair3:1.2.0'
   time          '10m'
 
   input:
