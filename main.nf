@@ -191,7 +191,7 @@ process busco {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/busco:5.8.2-prok-bacteria_odb12_2024-11-14'
+  container     'staphb/busco:6.0.0-prok-bacteria_odb12_2024-11-14'
   time          '45m'
 
   input:
@@ -206,7 +206,7 @@ process busco {
   task.ext.when == null || task.ext.when
 
   script:
-  def args   = task.ext.args   ?: '--offline -l /busco_downloads/lineages/bacteria_odb10'
+  def args   = task.ext.args   ?: '--offline -l /busco_downloads/lineages/bacteria_odb12'
   def prefix = task.ext.prefix ?: "${fasta.baseName}"
   """
   busco ${args} \
@@ -346,7 +346,7 @@ process copy {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '10m'
 
   input:
@@ -617,7 +617,7 @@ process gfa_to_fasta {
   tag           "${meta.id}"
   label         "process_low"
   // no publishDir
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '10m'
 
   input:
@@ -725,7 +725,7 @@ process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '10m'
 
   input:
@@ -751,7 +751,7 @@ process png {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}/bandage", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '10m'
 
   input:
@@ -1064,7 +1064,7 @@ process summary {
   tag           "Creating summary"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '30m'
   
   input:
@@ -1422,7 +1422,7 @@ process versions {
   tag           "extracting versions"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.28'
+  container     'staphb/multiqc:1.30'
   time          '30m'
   
   input:
@@ -1567,7 +1567,7 @@ process test {
   tag           "Downloading R10.4 reads"
   label         "process_low"
   publishDir    "${params.outdir}/test_files/", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/gfastats:1.3.10'
+  container     'staphb/gfastats:1.3.11'
   time          '1h'
 
   output:
