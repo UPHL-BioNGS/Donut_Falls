@@ -38,7 +38,6 @@ def circulocov_results():
 
       results[sample][assembler]['all']['warnings'] = ""
 
-
       results[sample][assembler]['all']['unmapped_nanopore'] = results[sample][assembler]['missing']['nanopore_numreads'] if 'nanopore_numreads' in results[sample][assembler]['missing'].keys() else 0
       results[sample][assembler]['all']['unmapped_nanopore_pc'] = round(float(results[sample][assembler]['all']['unmapped_nanopore']) / float(results[sample][assembler]['all']['nanopore_numreads']), 2)
       if results[sample][assembler]['all']['unmapped_nanopore_pc'] > 0.1:
@@ -51,7 +50,7 @@ def circulocov_results():
           results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Illumina reads,"
     return results
 
-def combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict):
+def combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict):
       final_results = seqkit_dict
 
       for key in final_results.keys():
@@ -62,8 +61,8 @@ def combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_d
         if key in pypolca_dict.keys():
           final_results[key]['pypolca'] = pypolca_dict[key]
 
-        if key in gfastats_dict.keys():
-          final_results[key]['gfastats'] = gfastats_dict[key]
+        if key in assembly_info_dict.keys():
+          final_results[key]['assembly'] = assembly_info_dict[key]
 
         if key in busco_dict.keys():
           final_results[key]['busco'] = busco_dict[key]
@@ -80,7 +79,7 @@ def final_file(results):
     with open('donut_falls_summary.json', 'w') as json_file:
       json.dump(results, json_file, indent=4)
 
-def gfastats_file(file):
+def assembly_info_file(file):
     results = {}
     with open(file, mode='r', newline='') as file:
       reader = csv.DictReader(file, delimiter=",")
@@ -198,10 +197,10 @@ def tsv_file(results_dict):
             for result in results_dict[sample][analysis][assembler].keys():
               final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
 
-      if 'gfastats' in results_dict[sample].keys():
-        for assembler in results_dict[sample]['gfastats'].keys():
+      if 'assembly_info' in results_dict[sample].keys():
+        for assembler in results_dict[sample]['assembly_info'].keys():
           for result in ['num_contigs', 'total_length', 'circ_contigs']:
-            final_results_dict[sample][f"{assembler}_gfastats_{result}"] = results_dict[sample]['gfastats'][assembler][result]
+            final_results_dict[sample][f"{assembler}_assembly_info_{result}"] = results_dict[sample]['assembly_info'][assembler][result]
 
       if 'circulocov' in results_dict[sample].keys():
         for assembler in results_dict[sample]['circulocov'].keys():
@@ -235,13 +234,15 @@ def main():
       print('FATAL : Something is wrong and seqkit results were not located.')
       exit(1)
 
-    mash_dict       = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
-    pypolca_dict    = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
-    gfastats_dict   = gfastats_file('gfastats_summary.csv') if exists('gfastats_summary.csv') else {}
+    mash_dict          = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
+    pypolca_dict       = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
+    assembly_info_dict = assembly_info_file('assembly_info.csv') if exists('assembly_info.csv') else {}
+    print(assembly_info_dict)
+    exit()
     busco_dict      = busco_results()
     circulocov_dict = circulocov_results()
 
-    final_results   = combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict)
+    final_results   = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
 
     final_file(final_results)
     tsv_file(final_results)
