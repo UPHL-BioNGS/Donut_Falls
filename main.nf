@@ -1062,7 +1062,7 @@ process raven {
   task.ext.when == null || task.ext.when
 
   script:
-  def args   = task.ext.args   ?: '--polishing-rounds 2'
+  def args   = task.ext.args   ?: '--polishing-rounds 2 --disable-checkpoints'
   def prefix = task.ext.prefix ?: "${meta.id}"
   """
   mkdir -p raven
