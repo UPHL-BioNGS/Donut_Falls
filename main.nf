@@ -261,6 +261,8 @@ process clair3 {
     --platform=ont \
     --model_path /clair3/models/ont
 
+  rm -rf clair3/tmp
+
   cat <<-END_VERSIONS > versions.yml
   "${task.process}":
     clair3: \$(run_clair3.sh  --version | awk '{print \$NF}')
@@ -1527,6 +1529,56 @@ process unicycler {
   """
 }
 
+process unicycler_info {
+  tag           "${meta.id}"
+  label         "process_low"
+  // no publishDir
+  container     'staphb/circulocov:0.1.20240104'
+  time          '10h'
+
+  input:
+  tuple val(meta), file(fasta)
+
+  output:
+  path "*assembly_info.txt", emit: assembly_info
+
+  when:
+  task.ext.when == null || task.ext.when
+
+  script:
+  def prefix    = task.ext.prefix ?: "${meta.id}"
+  """
+  #!/usr/bin/env python3
+import pandas as pd
+
+records = []
+with open("${fasta}") as f:
+  for line in f:
+    if line.startswith(">"):
+      line = line.strip().replace(">", "")
+      parts = line.split()
+      circular="N"
+      if "circular=true" in line:
+        circular="Y"
+
+      records.append({
+        "sample": "${prefix}",
+        "assembler": "unicycler",
+        "seq_name": parts[0],
+        "length": parts[1].split("=")[1],
+        "cov.": parts[2].split("=")[1],
+        "circ.": circular,
+        "repeat": "",
+        "mult.": "",
+        "alt_group": "",
+        "graph_path": ""
+      })
+    
+df = pd.DataFrame(records)
+df.to_csv("${prefix}_unicycler_assembly_info.txt", sep="\\t", index=False)
+  """
+}
+
 process versions {
   tag           "extracting versions"
   label         "process_low"
@@ -1781,7 +1833,9 @@ workflow DONUT_FALLS {
     if (params.assembler =~ /unicycler/ ) {
       unicycler(ch_dist_filter.join(ch_nanopore_input, by: 0, remainder: false))
 
-      unicycler.out.assembly_info
+      unicycler_info(unicycler.out.fasta)
+
+      unicycler_info.out.assembly_info
         .collectFile(
           storeDir: "${params.outdir}/summary/",
           keepHeader: true,
@@ -1976,11 +2030,11 @@ workflow DONUT_FALLS {
     versions(ch_collated_versions)
     ch_summary = ch_summary.mix(versions.out.versions)
 
-    //summary(ch_summary.unique().collect())
+    summary(ch_summary.unique().collect())
 
     multiqc(ch_summary.unique().collect())
 
-    //copy(ch_consensus.combine(gfastats_summary))
+    //copy(ch_consensus.combine(assembly_summary))
 
   emit:
     gfa              = ch_gfa
