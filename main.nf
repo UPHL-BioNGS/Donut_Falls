@@ -2035,7 +2035,7 @@ workflow DONUT_FALLS {
     versions(ch_collated_versions)
     ch_summary = ch_summary.mix(versions.out.versions)
 
-    summary(ch_summary.unique().collect())
+    //summary(ch_summary.unique().collect())
 
     multiqc(ch_summary.unique().collect())
 
