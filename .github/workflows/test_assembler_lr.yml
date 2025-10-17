@@ -1,4 +1,4 @@
-name: Test Donut Falls flye, raven, and myloasm assembly
+name: Test Donut Falls flye, raven, unicycler, and myloasm assembly
 
 on: [pull_request, workflow_dispatch]
 
@@ -9,7 +9,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-            
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install Nextflow
         run: |
           wget -qO- get.nextflow.io | bash
@@ -21,7 +27,7 @@ jobs:
           
           nextflow run . -profile docker,test \
             -c .github/workflows/github_actions.config \
-            --assembler flye_raven_myloasm
+            --assembler flye_raven_myloasm_unicycler
 
           tree donut_falls
 
@@ -32,4 +38,5 @@ jobs:
           ls  donut_falls/df/flye/assembly.fasta donut_falls/df/flye/assembly_graph.gfa
           ls  donut_falls/df/myloasm/assembly_primary.fa donut_falls/df/myloasm/final_contig_graph.gfa
           ls  donut_falls/df/raven/df_raven.fasta donut_falls/df/raven/df_raven.gfa
+          ls  donut_falls/test/unicycler/assembly.fasta donut_falls/test/unicycler/assembly.gfa
           cat donut_falls/summary/donut_falls_summary.json
