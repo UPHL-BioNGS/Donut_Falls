@@ -9,7 +9,16 @@ def busco_results():
     results = {}
     files = glob.glob('short_summary*txt')
     for file in files:
-      sample, assembler, step = file.split('.')[-2].rsplit("_", 2)
+      sample_assembler_step = file.split('.')[-2].split("_")
+      if sample_assembler_step[-1] == "unicycler":
+        assembler = "unicycler"
+        step = "unicycler"
+        sample = "_".join(sample_assembler_step[:-1])
+      else:
+        assembler = sample_assembler_step[-2]
+        step = sample_assembler_step[-1]
+        sample = "_".join(sample_assembler_step[:-2])
+      
       if sample not in results.keys():
         results[sample] = {}
       if assembler not in results[sample].keys():
@@ -82,27 +91,28 @@ def final_file(results):
 def assembly_info_file(file):
     results = {}
     with open(file, mode='r', newline='') as file:
-      reader = csv.DictReader(file, delimiter=",")
+      reader = csv.DictReader(file, delimiter="\t")
       for row in reader:
-        sample, assembler = row['sample'].rsplit("_", 1)
+        sample = row['sample']
+        assembler = row['assembler']
         if sample not in results.keys():
-          results[sample] = {}
+          results[sample] = {"assembly_info" : {} }
         if assembler not in results[sample].keys():
-          results[sample][assembler] = {}
-        results[sample][assembler][row['Header']] = row
+          results[sample]["assembly_info"][assembler] = {}
+        results[sample]["assembly_info"][assembler][row['seq_name']] = row
 
     for sample in results.keys():
-      for assembler in results[sample].keys():
+      for assembler in results[sample]['assembly_info'].keys():
         total_length = 0
         num_circular = 0
-        contigs = list(results[sample][assembler].keys())
-        results[sample][assembler]['num_contigs'] = len(contigs)
+        contigs = list(results[sample]['assembly_info'][assembler].keys())
+        results[sample]['assembly_info'][assembler]['num_contigs'] = len(contigs)
         for contig in contigs:
-          total_length = total_length + int(results[sample][assembler][contig]['Total segment length'])
-          if results[sample][assembler][contig]['Is circular'] == 'Y':
+          total_length = total_length + int(results[sample]['assembly_info'][assembler][contig]['length'])
+          if results[sample]['assembly_info'][assembler][contig]['circ.'] == 'Y':
             num_circular = num_circular + 1
-        results[sample][assembler]['total_length'] = total_length
-        results[sample][assembler]['circ_contigs'] = num_circular
+        results[sample]['assembly_info'][assembler]['total_length'] = total_length
+        results[sample]['assembly_info'][assembler]['circ_contigs'] = num_circular
     return results
 
 def mash_file(file):
@@ -198,9 +208,10 @@ def tsv_file(results_dict):
               final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
 
       if 'assembly_info' in results_dict[sample].keys():
+        print(results_dict[sample].keys())
         for assembler in results_dict[sample]['assembly_info'].keys():
           for result in ['num_contigs', 'total_length', 'circ_contigs']:
-            final_results_dict[sample][f"{assembler}_assembly_info_{result}"] = results_dict[sample]['assembly_info'][assembler][result]
+            final_results_dict[sample][f"{assembler}_{result}"] = results_dict[sample]['assembly_info'][assembler][result]
 
       if 'circulocov' in results_dict[sample].keys():
         for assembler in results_dict[sample]['circulocov'].keys():
@@ -209,22 +220,84 @@ def tsv_file(results_dict):
       
       all_keys += list(final_results_dict[sample].keys())
 
-    unique_key = list(set(all_keys))
+      unique_key = list(set(all_keys))
 
-    with open('donut_falls_summary.tsv', 'w') as tsv:
-      i = 0
-      for sample in sorted_keys:
-        for key in unique_key:
-          if key not in final_results_dict[sample].keys():
-            final_results_dict[sample][key] = ""
+      with open('donut_falls_summary.tsv', 'w') as tsv:
+        i = 0
+        for sample in sorted_keys:
+          for key in unique_key:
+            if key not in final_results_dict[sample].keys():
+              final_results_dict[sample][key] = ""
 
-        final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
+          final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-        w = csv.DictWriter(tsv, final_results_dict[sample].keys(), delimiter='\t')
-        if i < 1 :
-          w.writeheader()
-          i += 1
-        w.writerow(final_results_dict[sample])
+          possible_fieldnames = [
+            "sample",
+            "seqkit_num_seqs",
+            "seqkit_avg_len",
+            "seqkit_AvgQual",
+            "seqkit_GC(%)",
+            "mash_dist",
+            "flye_total_length",
+            "flye_num_contigs",
+            "flye_circ_contigs",
+            "flye_circulocov_nanopore_meandepth",
+            "flye_circulocov_unmapped_nanopore_pc",
+            "flye_circulocov_illumina_meandepth",
+            "flye_circulocov_unmapped_illumina_pc",
+            "flye_busco_reoriented",
+            "flye_busco_clair3",
+            "flye_busco_polypolish",
+            "flye_busco_pypolca",
+            "flye_pypolca_Insertion/Deletion_Errors_Found",
+            "flye_pypolca_Substitution_Errors_Found",
+            "myloasm_total_length",
+            "myloasm_num_contigs",
+            "myloasm_circ_contigs",
+            "myloasm_circulocov_nanopore_meandepth",
+            "myloasm_circulocov_unmapped_nanopore_pc",
+            "myloasm_circulocov_illumina_meandepth",
+            "myloasm_circulocov_unmapped_illumina_pc",
+            "myloasm_busco_reoriented",
+            "myloasm_busco_clair3",
+            "myloasm_busco_polypolish",
+            "myloasm_busco_pypolca",
+            "myloasm_pypolca_Insertion/Deletion_Errors_Found",
+            "myloasm_pypolca_Substitution_Errors_Found",
+            "raven_total_length",
+            "raven_num_contigs",
+            "raven_circ_contigs",
+            "raven_circulocov_nanopore_meandepth",
+            "raven_circulocov_unmapped_nanopore_pc",
+            "raven_circulocov_illumina_meandepth",
+            "raven_circulocov_unmapped_illumina_pc",
+            "raven_busco_reoriented",
+            "raven_busco_clair3",
+            "raven_busco_polypolish",
+            "raven_busco_pypolca",
+            "raven_pypolca_Insertion/Deletion_Errors_Found",
+            "raven_pypolca_Substitution_Errors_Found",
+            "unicycler_total_length",
+            "unicycler_num_contigs",
+            "unicycler_circ_contigs",
+            "unicycler_circulocov_nanopore_meandepth",
+            "unicycler_circulocov_unmapped_nanopore_pc",
+            "unicycler_circulocov_illumina_meandepth",
+            "unicycler_circulocov_unmapped_illumina_pc",
+            "unicycler_busco_unicycler"
+          ]
+
+          fieldnames = []
+          for name in possible_fieldnames:
+            if name in final_results_dict[sample].keys():
+              fieldnames.append(name)
+
+          w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\t')
+          if i < 1 :
+            w.writeheader()
+            i += 1
+          filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
+          w.writerow(filtered_row)
 
 def main():
 
@@ -237,12 +310,10 @@ def main():
     mash_dict          = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
     pypolca_dict       = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
     assembly_info_dict = assembly_info_file('assembly_info.csv') if exists('assembly_info.csv') else {}
-    print(assembly_info_dict)
-    exit()
-    busco_dict      = busco_results()
-    circulocov_dict = circulocov_results()
+    busco_dict         = busco_results()
+    circulocov_dict    = circulocov_results()
 
-    final_results   = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
+    final_results      = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
 
     final_file(final_results)
     tsv_file(final_results)

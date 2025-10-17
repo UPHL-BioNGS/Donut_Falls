@@ -1466,7 +1466,7 @@ process summary {
 
   def main():
 
-      seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
+      seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsvx') else {}
       
       if not seqkit_dict:
         print('FATAL : Something is wrong and seqkit results were not located.')
@@ -1725,7 +1725,7 @@ process versions {
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 
 process test {
-  tag           "Downloading R10.4 reads"
+  tag           "Downloading test reads"
   label         "process_low"
   publishDir    "${params.outdir}/test_files/", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/gfastats:1.3.11'
@@ -1733,14 +1733,19 @@ process test {
 
   output:
   tuple val("df"), file("test_files/test_nanopore.fastq.gz"), file("test_files/test_illumina_{1,2}.fastq.gz"), emit: fastq
+  tuple val("test"), file("long_reads_high_depth.fastq.gz"), file("short_reads_R{1,2}.fastq.gz"), emit: unicycler_fastq
 
   when:
   task.ext.when == null || task.ext.when
 
   script:
   """
-  wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+  wget https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
   tar -xvf dataset.tar.gz
+
+  wget https://ndownloader.figshare.com/files/8801833 -O long_reads_high_depth.fastq.gz
+  wget https://ndownloader.figshare.com/files/8801839 -O short_reads_R1.fastq.gz
+  wget https://ndownloader.figshare.com/files/8801842 -O short_reads_R2.fastq.gz
   """
 }
 
@@ -2133,17 +2138,34 @@ workflow {
     .set { ch_nanopore_input }
 
   if (params.test) {
-
+    ch_test_out = Channel.empty()
     test()
 
-    test.out.fastq
-      .map { it ->
-        def meta = [id:it[0]] 
-        tuple( meta,
-          file("${it[1]}", checkIfExists: true),
-          [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
-      }
-      .set{ ch_test_out }
+    if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
+      test.out.fastq
+        .map { it ->
+          def meta = [id:it[0]] 
+          tuple( meta,
+            file("${it[1]}", checkIfExists: true),
+            [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
+        }
+        .set{ ch_test_r10 }
+
+      ch_test_out = ch_test_out.mix(ch_test_r10)
+    }
+
+    if (params.assembler =~ /unicycler/ ) {
+      test.out.unicycler_fastq
+        .map { it ->
+          def meta = [id:it[0]] 
+          tuple( meta,
+            file("${it[1]}", checkIfExists: true),
+            [file("${it[2][0]}", checkIfExists: true), file("${it[2][1]}", checkIfExists: true)])
+        }
+        .set{ ch_test_unicycler }
+
+      ch_test_out = ch_test_out.mix(ch_test_unicycler)
+    }
 
     ch_test_out
       .map{it -> tuple(it[0], it[1])}
