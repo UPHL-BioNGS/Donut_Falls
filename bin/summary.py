@@ -22,7 +22,7 @@ def busco_results():
       if sample not in results.keys():
         results[sample] = {}
       if assembler not in results[sample].keys():
-        results[sample][assembler] = {}      
+        results[sample][assembler] = { }      
       with open(file, 'r') as f:
         for line in f:
           if 'C:' and 'S:' and 'D:' and 'F:' and 'M:' and 'n:' in line:
@@ -34,7 +34,7 @@ def circulocov_results():
     results = {}
     files = glob.glob('*overall_summary.txt')
     for file in files:
-      sample, assembler = file.replace('_reoriented_overall_summary.txt','').rsplit("_", 1)
+      sample, assembler = file.replace('_reoriented', '').replace('_overall_summary.txt','').rsplit("_", 1)
       if sample not in results.keys():
         results[sample] = {}
       if assembler not in results[sample].keys():
@@ -60,29 +60,27 @@ def circulocov_results():
     return results
 
 def combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict):
-      final_results = seqkit_dict
 
-      for key in final_results.keys():
+    final_results = seqkit_dict.copy()
 
-        if key in mash_dict.keys():
-          final_results[key]['mash'] = mash_dict[key]
+    tool_results = [
+        ('mash', mash_dict),
+        ('pypolca', pypolca_dict),
+        ('assembly_info', assembly_info_dict),
+        ('busco', busco_dict),
+        ('circulocov', circulocov_dict),
+    ]
 
-        if key in pypolca_dict.keys():
-          final_results[key]['pypolca'] = pypolca_dict[key]
+    #final_results[key]['assemblers'] = '${params.assembler}'
+    assemblers = 'flye,unicycler,raven,myloasm'
 
-        if key in assembly_info_dict.keys():
-          final_results[key]['assembly'] = assembly_info_dict[key]
-
-        if key in busco_dict.keys():
-          final_results[key]['busco'] = busco_dict[key]
-
-        if key in circulocov_dict.keys():
-          final_results[key]['circulocov'] = circulocov_dict[key]
-
-        #final_results[key]['assemblers'] = '${params.assembler}'
-        final_results[key]['assemblers'] = 'flye,unicycler,raven,myloasm'
-      
-      return final_results
+    for key in final_results:
+        final_results[key]['assemblers'] = assemblers
+        
+        for tool_name, tool_dict in tool_results:
+            if key in tool_dict:
+                final_results[key][tool_name] = tool_dict[key]
+    return final_results
         
 def final_file(results):
     with open('donut_falls_summary.json', 'w') as json_file:
@@ -96,23 +94,23 @@ def assembly_info_file(file):
         sample = row['sample']
         assembler = row['assembler']
         if sample not in results.keys():
-          results[sample] = {"assembly_info" : {} }
+          results[sample] = { }
         if assembler not in results[sample].keys():
-          results[sample]["assembly_info"][assembler] = {}
-        results[sample]["assembly_info"][assembler][row['seq_name']] = row
+          results[sample][assembler] = {}
+        results[sample][assembler][row['seq_name']] = row
 
     for sample in results.keys():
-      for assembler in results[sample]['assembly_info'].keys():
+      for assembler in results[sample].keys():
         total_length = 0
         num_circular = 0
-        contigs = list(results[sample]['assembly_info'][assembler].keys())
-        results[sample]['assembly_info'][assembler]['num_contigs'] = len(contigs)
+        contigs = list(results[sample][assembler].keys())
+        results[sample][assembler]['num_contigs'] = len(contigs)
         for contig in contigs:
-          total_length = total_length + int(results[sample]['assembly_info'][assembler][contig]['length'])
-          if results[sample]['assembly_info'][assembler][contig]['circ.'] == 'Y':
+          total_length = total_length + int(results[sample][assembler][contig]['length'])
+          if results[sample][assembler][contig]['circ.'] == 'Y':
             num_circular = num_circular + 1
-        results[sample]['assembly_info'][assembler]['total_length'] = total_length
-        results[sample]['assembly_info'][assembler]['circ_contigs'] = num_circular
+        results[sample][assembler]['total_length'] = total_length
+        results[sample][assembler]['circ_contigs'] = num_circular
     return results
 
 def mash_file(file):
@@ -208,7 +206,6 @@ def tsv_file(results_dict):
               final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
 
       if 'assembly_info' in results_dict[sample].keys():
-        print(results_dict[sample].keys())
         for assembler in results_dict[sample]['assembly_info'].keys():
           for result in ['num_contigs', 'total_length', 'circ_contigs']:
             final_results_dict[sample][f"{assembler}_{result}"] = results_dict[sample]['assembly_info'][assembler][result]
@@ -299,24 +296,19 @@ def tsv_file(results_dict):
           filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
           w.writerow(filtered_row)
 
-def main():
-
-    seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
+seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
     
-    if not seqkit_dict:
-      print('FATAL : Something is wrong and seqkit results were not located.')
-      exit(1)
+if not seqkit_dict:
+  print('FATAL : Something is wrong and seqkit results were not located.')
+  exit(1)
 
-    mash_dict          = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
-    pypolca_dict       = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
-    assembly_info_dict = assembly_info_file('assembly_info.csv') if exists('assembly_info.csv') else {}
-    busco_dict         = busco_results()
-    circulocov_dict    = circulocov_results()
+mash_dict          = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
+pypolca_dict       = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
+assembly_info_dict = assembly_info_file('assembly_info.csv') if exists('assembly_info.csv') else {}
+busco_dict         = busco_results()
+circulocov_dict    = circulocov_results()
 
-    final_results      = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
+final_results      = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
 
-    final_file(final_results)
-    tsv_file(final_results)
-
-if __name__ == '__main__':
-  main()
+final_file(final_results)
+tsv_file(final_results)
