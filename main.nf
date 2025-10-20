@@ -401,7 +401,7 @@ process fastp {
   tuple val(meta), file(reads)
 
   output:
-  tuple val(meta), file("fastp/*_fastp*.fastq.gz"), emit: fastq
+  tuple val(meta), file("fastp/*_fastp*.fastq.gz"), emit: fastq, optional: true
   path "fastp/*", emit: everything
   path "fastp/*_fastp*.json", emit: summary
   path "versions.yml", emit: versions
@@ -440,7 +440,7 @@ process fastplong {
   tuple val(meta), file(reads)
 
   output:
-  tuple val(meta), file("fastplong/*_fastp*.fastq.gz"), emit: fastq
+  tuple val(meta), file("fastplong/*_fastp*.fastq.gz"), emit: fastq, optional: true
   path "fastplong/*", emit: everything
   path "fastplong/*_fastp*.json", emit: summary
   path "versions.yml", emit: versions
@@ -910,7 +910,7 @@ process polypolish {
   tuple val(meta), file(fasta), file(sam)
 
   output:
-  tuple val(meta), file("polypolish/*_polypolish.fasta"), emit: fasta
+  tuple val(meta), file("polypolish/*_polypolish.fasta"), emit: fasta, optional: true
   path "versions.yml", emit: versions
 
   when:
@@ -1017,7 +1017,7 @@ process rasusa {
   tuple val(meta), file(fastq)
 
   output:
-  tuple val(meta), file("rasusa/*.fastq.gz"), emit: fastq
+  tuple val(meta), file("rasusa/*.fastq.gz"), emit: fastq, optional: true
   path "versions.yml", emit: versions 
   
   when:
@@ -1970,6 +1970,8 @@ workflow DONUT_FALLS {
 
       ch_clair3_fa = ch_clair3_fa.mix(bcftools.out.fasta)
 
+
+      // to do fix this filter
       ch_clair3_fa
         .mix(ch_unicycler_fa)
         .join(ch_dist_filter.flatMap { tuple -> (1..num_assemblers).collect { tuple } }, by: 0, remainder: true)
