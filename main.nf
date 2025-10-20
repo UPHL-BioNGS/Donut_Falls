@@ -1971,7 +1971,6 @@ workflow DONUT_FALLS {
         .join(ch_dist_filter.flatMap { tuple -> (1..num_assemblers).collect { tuple } }, by: 0, remainder: true)
         .filter{ it -> if (it) {it[1]}}
         .filter{ it[2] }
-        .view()
         .set{ ch_clair3_polished }
 
       bwa(ch_clair3_polished)
