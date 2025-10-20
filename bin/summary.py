@@ -185,6 +185,7 @@ def tsv_file(results_dict):
     # converting the final dict to something tsv friendly
     sorted_keys = list(sorted(results_dict.keys()))
     all_keys = []
+    print(sorted_keys)
     for sample in sorted_keys:
       final_results_dict[sample] = {}
       if 'nanopore' in results_dict[sample].keys():
@@ -217,18 +218,18 @@ def tsv_file(results_dict):
       
       all_keys += list(final_results_dict[sample].keys())
 
-      unique_key = list(set(all_keys))
+    unique_key = list(set(all_keys))
 
-      with open('donut_falls_summary.tsv', 'w') as tsv:
-        i = 0
-        for sample in sorted_keys:
-          for key in unique_key:
-            if key not in final_results_dict[sample].keys():
-              final_results_dict[sample][key] = ""
+    with open('donut_falls_summary.tsv', 'w') as tsv:
+      i = 0
+      for sample in sorted_keys:
+        for key in unique_key:
+          if key not in final_results_dict[sample].keys():
+            final_results_dict[sample][key] = ""
 
-          final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
+        final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-          possible_fieldnames = [
+        possible_fieldnames = [
             "sample",
             "seqkit_num_seqs",
             "seqkit_avg_len",
@@ -284,17 +285,17 @@ def tsv_file(results_dict):
             "unicycler_busco_unicycler"
           ]
 
-          fieldnames = []
-          for name in possible_fieldnames:
-            if name in final_results_dict[sample].keys():
-              fieldnames.append(name)
+        fieldnames = []
+        for name in possible_fieldnames:
+          if name in final_results_dict[sample].keys():
+            fieldnames.append(name)
 
-          w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\t')
-          if i < 1 :
-            w.writeheader()
-            i += 1
-          filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
-          w.writerow(filtered_row)
+        w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\t')
+        if i < 1 :
+          w.writeheader()
+          i += 1
+        filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
+        w.writerow(filtered_row)
 
 seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
     
