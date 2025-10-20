@@ -1,26 +1,14 @@
 #!/usr/bin/env python3
-import glob
 import os
+import shutil
 import pandas as pd
 
-def clean_name(name):
+def clean_name(sample_assembler):
     for x in [".fasta", "_reoriented", "_clair3", "_polypolish", "_pypolca"]:
-        name = name.replace(x, '')
-    return name
+        sample_assembler = sample_assembler.replace(x, '')
 
-def copy_fasta(fasta, df):
-    with open(fasta, 'r') as file:
-        with open(f"consensus/{fasta}", 'w') as outfile:
-            for line in file:
-                line = line.strip().replace(".1,mult",",mult")
-                if line.startswith('>'):
-                    header = line.split()[0].replace(">", "")
-                    length = df.loc[df['Header'] == header, 'Total segment length'].values[0]
-                    circular = df.loc[df['Header'] == header, 'Is circular'].values[0]
-                    gc_per = df.loc[df['Header'] == header, 'GC content %'].values[0]
-                    outfile.write(f">{header} length={length} circular={circular} gc_per={gc_per}\n")
-                else:
-                    outfile.write(f"{line}\n")
+    sample, assembler = sample_assembler.rsplit('_', 1)
+    return sample, assembler
 
 def sub_fasta(fasta):
     with open(fasta, 'r') as file:
@@ -37,21 +25,15 @@ def sub_fasta(fasta):
                     outfile.write(f"{line}\n")
 
 
-def main():
-    #os.mkdir('consensus')
+#os.mkdir('consensus')
 
-    fasta = glob.glob('*.fasta')[0]
-    name = clean_name(fasta)
-    pd.set_option('display.max_colwidth', None)
-    df = pd.read_csv('gfastats_summary.csv')
-    df = df[df['sample'] == name].copy()
-    df['Header'] = df['Header'].str.replace("duplicated-no.1","duplicated-no").str.replace("duplicated-yes.1","duplicated-yes").str.replace("duplicated-probably.1","duplicated-probably")
-    df['Is circular'] = df['Is circular'].replace({"N": "false", "Y": "true"})
+fasta = "test_unicycler.fasta"
 
-    copy_fasta(fasta, df)
+shutil.copy(fasta, f"consensus/{fasta}")
 
-    if not (df['Is circular'] == "N").any():
-        sub_fasta(fasta)
+sample, assembler = clean_name(fasta)
+df = pd.read_table('assembly_info.csv')
+df = df[(df['sample'] == sample) & (df['assembler'] == assembler)].copy()
+if not (df['circ.'] == "N").any():
+    sub_fasta(fasta)
 
-if __name__ == '__main__':
-    main()
