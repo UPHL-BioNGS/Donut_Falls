@@ -1384,84 +1384,84 @@ def tsv_file(results_dict):
       
       all_keys += list(final_results_dict[sample].keys())
 
-      unique_key = list(set(all_keys))
+    unique_key = list(set(all_keys))
 
-      with open('donut_falls_summary.tsv', 'w') as tsv:
-        i = 0
-        for sample in sorted_keys:
-          for key in unique_key:
-            if key not in final_results_dict[sample].keys():
-              final_results_dict[sample][key] = ""
+    with open('donut_falls_summary.tsv', 'w') as tsv:
+      i = 0
+      for sample in sorted_keys:
+        for key in unique_key:
+          if key not in final_results_dict[sample].keys():
+            final_results_dict[sample][key] = ""
 
-          final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
+        final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-          possible_fieldnames = [
-            "sample",
-            "seqkit_num_seqs",
-            "seqkit_avg_len",
-            "seqkit_AvgQual",
-            "seqkit_GC(%)",
-            "mash_dist",
-            "flye_total_length",
-            "flye_num_contigs",
-            "flye_circ_contigs",
-            "flye_circulocov_nanopore_meandepth",
-            "flye_circulocov_unmapped_nanopore_pc",
-            "flye_circulocov_illumina_meandepth",
-            "flye_circulocov_unmapped_illumina_pc",
-            "flye_busco_reoriented",
-            "flye_busco_clair3",
-            "flye_busco_polypolish",
-            "flye_busco_pypolca",
-            "flye_pypolca_Insertion/Deletion_Errors_Found",
-            "flye_pypolca_Substitution_Errors_Found",
-            "myloasm_total_length",
-            "myloasm_num_contigs",
-            "myloasm_circ_contigs",
-            "myloasm_circulocov_nanopore_meandepth",
-            "myloasm_circulocov_unmapped_nanopore_pc",
-            "myloasm_circulocov_illumina_meandepth",
-            "myloasm_circulocov_unmapped_illumina_pc",
-            "myloasm_busco_reoriented",
-            "myloasm_busco_clair3",
-            "myloasm_busco_polypolish",
-            "myloasm_busco_pypolca",
-            "myloasm_pypolca_Insertion/Deletion_Errors_Found",
-            "myloasm_pypolca_Substitution_Errors_Found",
-            "raven_total_length",
-            "raven_num_contigs",
-            "raven_circ_contigs",
-            "raven_circulocov_nanopore_meandepth",
-            "raven_circulocov_unmapped_nanopore_pc",
-            "raven_circulocov_illumina_meandepth",
-            "raven_circulocov_unmapped_illumina_pc",
-            "raven_busco_reoriented",
-            "raven_busco_clair3",
-            "raven_busco_polypolish",
-            "raven_busco_pypolca",
-            "raven_pypolca_Insertion/Deletion_Errors_Found",
-            "raven_pypolca_Substitution_Errors_Found",
-            "unicycler_total_length",
-            "unicycler_num_contigs",
-            "unicycler_circ_contigs",
-            "unicycler_circulocov_nanopore_meandepth",
-            "unicycler_circulocov_unmapped_nanopore_pc",
-            "unicycler_circulocov_illumina_meandepth",
-            "unicycler_circulocov_unmapped_illumina_pc",
-            "unicycler_busco_unicycler"
-          ]
+        possible_fieldnames = [
+          "sample",
+          "seqkit_num_seqs",
+          "seqkit_avg_len",
+          "seqkit_AvgQual",
+          "seqkit_GC(%)",
+          "mash_dist",
+          "flye_total_length",
+          "flye_num_contigs",
+          "flye_circ_contigs",
+          "flye_circulocov_nanopore_meandepth",
+          "flye_circulocov_unmapped_nanopore_pc",
+          "flye_circulocov_illumina_meandepth",
+          "flye_circulocov_unmapped_illumina_pc",
+          "flye_busco_reoriented",
+          "flye_busco_clair3",
+          "flye_busco_polypolish",
+          "flye_busco_pypolca",
+          "flye_pypolca_Insertion/Deletion_Errors_Found",
+          "flye_pypolca_Substitution_Errors_Found",
+          "myloasm_total_length",
+          "myloasm_num_contigs",
+          "myloasm_circ_contigs",
+          "myloasm_circulocov_nanopore_meandepth",
+          "myloasm_circulocov_unmapped_nanopore_pc",
+          "myloasm_circulocov_illumina_meandepth",
+          "myloasm_circulocov_unmapped_illumina_pc",
+          "myloasm_busco_reoriented",
+          "myloasm_busco_clair3",
+          "myloasm_busco_polypolish",
+          "myloasm_busco_pypolca",
+          "myloasm_pypolca_Insertion/Deletion_Errors_Found",
+          "myloasm_pypolca_Substitution_Errors_Found",
+          "raven_total_length",
+          "raven_num_contigs",
+          "raven_circ_contigs",
+          "raven_circulocov_nanopore_meandepth",
+          "raven_circulocov_unmapped_nanopore_pc",
+          "raven_circulocov_illumina_meandepth",
+          "raven_circulocov_unmapped_illumina_pc",
+          "raven_busco_reoriented",
+          "raven_busco_clair3",
+          "raven_busco_polypolish",
+          "raven_busco_pypolca",
+          "raven_pypolca_Insertion/Deletion_Errors_Found",
+          "raven_pypolca_Substitution_Errors_Found",
+          "unicycler_total_length",
+          "unicycler_num_contigs",
+          "unicycler_circ_contigs",
+          "unicycler_circulocov_nanopore_meandepth",
+          "unicycler_circulocov_unmapped_nanopore_pc",
+          "unicycler_circulocov_illumina_meandepth",
+          "unicycler_circulocov_unmapped_illumina_pc",
+          "unicycler_busco_unicycler"
+        ]
 
-          fieldnames = []
-          for name in possible_fieldnames:
-            if name in final_results_dict[sample].keys():
-              fieldnames.append(name)
+        fieldnames = []
+        for name in possible_fieldnames:
+          if name in final_results_dict[sample].keys():
+            fieldnames.append(name)
 
-          w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\\t')
-          if i < 1 :
-            w.writeheader()
-            i += 1
-          filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
-          w.writerow(filtered_row)
+        w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\\t')
+        if i < 1 :
+          w.writeheader()
+          i += 1
+        filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
+        w.writerow(filtered_row)
 
 seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
     
@@ -1970,6 +1970,8 @@ workflow DONUT_FALLS {
         .mix(ch_unicycler_fa)
         .join(ch_dist_filter.flatMap { tuple -> (1..num_assemblers).collect { tuple } }, by: 0, remainder: true)
         .filter{ it -> if (it) {it[1]}}
+        .filter{ it[2] }
+        .view()
         .set{ ch_clair3_polished }
 
       bwa(ch_clair3_polished)
