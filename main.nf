@@ -415,7 +415,7 @@ process fastplong {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastplong:0.2.2'
+  container     'staphb/fastplong:0.4.1'
 
   input:
   tuple val(meta), file(reads)
