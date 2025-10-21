@@ -1,6 +1,23 @@
 reports:
   multiqc_report.html:
     display: "MultiQC report"
-  NanoStats.csv:
-    display: "NanoStats results"
-    
+  donut_falls_summary.tsv:
+    display: "Donut Falls Summary"
+  "execution_report_*.html ":
+    display: "Nextflow execution report"
+  "execution_timeline_*.html":
+    display: "Nextflow execution timeline"
+  "execution_trace_*.txt":
+    display: "Nextflow trace file"
+  "pipeline_dag_*.html":
+    display: "Nextflow workflow diagram"
+  assembly_info.csv:
+    display: "Basic Assembly Info"
+  circulocov_summary.txt:
+    display: "CirculoCov summary"
+  mash_summary.tsv:
+    display: "Mash Dist Summary"
+  pypolca_summary.tsv:
+    display: "Pypolca Summary"    
+  seqkit_summary.tsv:
+    display: "Seqkit Stats"
