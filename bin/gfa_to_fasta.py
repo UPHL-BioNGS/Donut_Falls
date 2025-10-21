@@ -1,36 +1,61 @@
 #!/usr/bin/env python3
-import csv
-import glob
 
-def convert_to_fasta(summary_dict, gfa_file):
-    outfile = '_'.join(gfa_file.split('.')[:-1]) + ".fasta"
-    with open(gfa_file, mode='r') as file:
+import pandas as pd
+from pathlib import Path
+
+def convert_to_fasta(records, gfa_file):
+    gfa_path = Path(gfa_file)
+    outfile = gfa_path.with_suffix(".fasta")
+
+    # Convert list of records to a dict for fast lookup
+    rec_dict = {r['seq_name']: r for r in records}
+
+    with open(gfa_file, 'r') as file, open(outfile, 'w') as output_file:
         for line in file:
-            parts = line.split()
+            parts = line.strip().split()
             if parts and parts[0] == "S":
                 header = parts[1]
                 seq = parts[2]
-                if header in summary_dict.keys():
-                    new_header = f">{header} length={summary_dict[header]['Total segment length']} circular={summary_dict[header]["Is circular"].replace("N","false").replace("Y","true")} gc_per={summary_dict[header]["GC content %"]}\\n"
-                    with open(outfile, mode='a') as output_file:
-                        output_file.write(new_header)
-                        output_file.write(seq + "\\n")
+                if header in rec_dict:
+                    rec = rec_dict[header]
+                    new_header = f">{header} length={rec['length']} circular={rec['circ.']} gc_per={rec['GC content %']}\n"
+                    output_file.write(new_header)
+                    output_file.write(seq + "\n")
 
-def read_summary_csv(gfastats_file):
-    summary_dict = {}
-    with open(gfastats_file, mode='r', newline='') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            key = row['Header']
-            summary_dict[key] = row
-            with open("noncircular.txt", mode='a') as output_file:
-                if summary_dict[key]["Is circular"] == "N":
-                    output_file.write(key + "\\n")
-    return summary_dict
 
-gfastats_file = glob.glob("*_gfastats_summary.csv")
-gfa_file = glob.glob("*.gfa")
+def read_gfastats(gfastats_file):
+    records = []  # must be a list to append dicts
+    with open(gfastats_file, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("Seq"):  # skip header or empty lines
+                continue
+            parts = line.split()
+            records.append({
+                "sample": "prefix",
+                "assembler": "raven",
+                "seq_name": parts[1],
+                "length": parts[3],
+                "cov.": "",
+                "circ.": parts[-1],
+                "repeat": "",
+                "mult.": "",
+                "alt_group": "",
+                "graph_path": "",
+                "GC content %": parts[-3]  # assuming GC content is column 8 (0-based indexing)
+            })
+    return records
 
-summary_dict = read_summary_csv(gfastats_file[0])
+# Read stats and convert
+records = read_gfastats("df_raven_gfastats.txt")
+convert_to_fasta(records, "df_raven.gfa")
 
-convert_to_fasta(summary_dict, gfa_file[0])
+# Create DataFrame and save selected columns
+df = pd.DataFrame(records)
+print(df.to_csv(sep="\t", index=False))
+df.to_csv(
+    "prefix_assembly_info.txt",
+    sep="\t",
+    columns=["sample", "assembler", "seq_name", "length", "cov.", "circ.", "repeat", "mult.", "alt_group", "graph_path"],
+    index=False
+)

@@ -17,7 +17,7 @@ jobs:
  
       - name: Get files
         run: |
-          wget --quiet https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+          wget https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
           tar -xvf dataset.tar.gz
 
           cp test_files/test_nanopore.fastq.gz test_files/test_nanopore_only.fastq.gz
@@ -26,7 +26,9 @@ jobs:
         run: |
           docker --version
           
-          nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/sample_sheet_all.csv
+          nextflow run . -profile docker \
+            -c .github/workflows/github_actions.config \
+            --sample_sheet .github/workflows/sample_sheet_all.csv
 
           tree donut_falls
 

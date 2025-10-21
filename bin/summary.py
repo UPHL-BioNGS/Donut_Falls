@@ -9,11 +9,20 @@ def busco_results():
     results = {}
     files = glob.glob('short_summary*txt')
     for file in files:
-      sample, assembler, step = file.split('.')[-2].rsplit("_", 2)
+      sample_assembler_step = file.split('.')[-2].split("_")
+      if sample_assembler_step[-1] == "unicycler":
+        assembler = "unicycler"
+        step = "unicycler"
+        sample = "_".join(sample_assembler_step[:-1])
+      else:
+        assembler = sample_assembler_step[-2]
+        step = sample_assembler_step[-1]
+        sample = "_".join(sample_assembler_step[:-2])
+      
       if sample not in results.keys():
         results[sample] = {}
       if assembler not in results[sample].keys():
-        results[sample][assembler] = {}      
+        results[sample][assembler] = { }      
       with open(file, 'r') as f:
         for line in f:
           if 'C:' and 'S:' and 'D:' and 'F:' and 'M:' and 'n:' in line:
@@ -25,7 +34,7 @@ def circulocov_results():
     results = {}
     files = glob.glob('*overall_summary.txt')
     for file in files:
-      sample, assembler = file.replace('_reoriented_overall_summary.txt','').rsplit("_", 1)
+      sample, assembler = file.replace('_reoriented', '').replace('_overall_summary.txt','').rsplit("_", 1)
       if sample not in results.keys():
         results[sample] = {}
       if assembler not in results[sample].keys():
@@ -37,7 +46,6 @@ def circulocov_results():
           results[sample][assembler][row['contigs']] = row
 
       results[sample][assembler]['all']['warnings'] = ""
-
 
       results[sample][assembler]['all']['unmapped_nanopore'] = results[sample][assembler]['missing']['nanopore_numreads'] if 'nanopore_numreads' in results[sample][assembler]['missing'].keys() else 0
       results[sample][assembler]['all']['unmapped_nanopore_pc'] = round(float(results[sample][assembler]['all']['unmapped_nanopore']) / float(results[sample][assembler]['all']['nanopore_numreads']), 2)
@@ -51,46 +59,45 @@ def circulocov_results():
           results[sample][assembler]['all']['warnings'] += "High proportion of unmapped Illumina reads,"
     return results
 
-def combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict):
-      final_results = seqkit_dict
+def combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict):
 
-      for key in final_results.keys():
+    final_results = seqkit_dict.copy()
 
-        if key in mash_dict.keys():
-          final_results[key]['mash'] = mash_dict[key]
+    tool_results = [
+        ('mash', mash_dict),
+        ('pypolca', pypolca_dict),
+        ('assembly_info', assembly_info_dict),
+        ('busco', busco_dict),
+        ('circulocov', circulocov_dict),
+    ]
 
-        if key in pypolca_dict.keys():
-          final_results[key]['pypolca'] = pypolca_dict[key]
+    #final_results[key]['assemblers'] = '${params.assembler}'
+    assemblers = 'flye,unicycler,raven,myloasm'
 
-        if key in gfastats_dict.keys():
-          final_results[key]['gfastats'] = gfastats_dict[key]
-
-        if key in busco_dict.keys():
-          final_results[key]['busco'] = busco_dict[key]
-
-        if key in circulocov_dict.keys():
-          final_results[key]['circulocov'] = circulocov_dict[key]
-
-        #final_results[key]['assemblers'] = '${params.assembler}'
-        final_results[key]['assemblers'] = 'flye,unicycler,raven,myloasm'
-      
-      return final_results
+    for key in final_results:
+        final_results[key]['assemblers'] = assemblers
+        
+        for tool_name, tool_dict in tool_results:
+            if key in tool_dict:
+                final_results[key][tool_name] = tool_dict[key]
+    return final_results
         
 def final_file(results):
     with open('donut_falls_summary.json', 'w') as json_file:
       json.dump(results, json_file, indent=4)
 
-def gfastats_file(file):
+def assembly_info_file(file):
     results = {}
     with open(file, mode='r', newline='') as file:
-      reader = csv.DictReader(file, delimiter=",")
+      reader = csv.DictReader(file, delimiter="\t")
       for row in reader:
-        sample, assembler = row['sample'].rsplit("_", 1)
+        sample = row['sample']
+        assembler = row['assembler']
         if sample not in results.keys():
-          results[sample] = {}
+          results[sample] = { }
         if assembler not in results[sample].keys():
           results[sample][assembler] = {}
-        results[sample][assembler][row['Header']] = row
+        results[sample][assembler][row['seq_name']] = row
 
     for sample in results.keys():
       for assembler in results[sample].keys():
@@ -99,8 +106,8 @@ def gfastats_file(file):
         contigs = list(results[sample][assembler].keys())
         results[sample][assembler]['num_contigs'] = len(contigs)
         for contig in contigs:
-          total_length = total_length + int(results[sample][assembler][contig]['Total segment length'])
-          if results[sample][assembler][contig]['Is circular'] == 'Y':
+          total_length = total_length + int(results[sample][assembler][contig]['length'])
+          if results[sample][assembler][contig]['circ.'] == 'Y':
             num_circular = num_circular + 1
         results[sample][assembler]['total_length'] = total_length
         results[sample][assembler]['circ_contigs'] = num_circular
@@ -178,6 +185,7 @@ def tsv_file(results_dict):
     # converting the final dict to something tsv friendly
     sorted_keys = list(sorted(results_dict.keys()))
     all_keys = []
+    print(sorted_keys)
     for sample in sorted_keys:
       final_results_dict[sample] = {}
       if 'nanopore' in results_dict[sample].keys():
@@ -198,10 +206,10 @@ def tsv_file(results_dict):
             for result in results_dict[sample][analysis][assembler].keys():
               final_results_dict[sample][f"{assembler}_{analysis}_{result}"] = results_dict[sample][analysis][assembler][result]
 
-      if 'gfastats' in results_dict[sample].keys():
-        for assembler in results_dict[sample]['gfastats'].keys():
+      if 'assembly_info' in results_dict[sample].keys():
+        for assembler in results_dict[sample]['assembly_info'].keys():
           for result in ['num_contigs', 'total_length', 'circ_contigs']:
-            final_results_dict[sample][f"{assembler}_gfastats_{result}"] = results_dict[sample]['gfastats'][assembler][result]
+            final_results_dict[sample][f"{assembler}_{result}"] = results_dict[sample]['assembly_info'][assembler][result]
 
       if 'circulocov' in results_dict[sample].keys():
         for assembler in results_dict[sample]['circulocov'].keys():
@@ -221,30 +229,87 @@ def tsv_file(results_dict):
 
         final_results_dict[sample] = { "sample": sample, **dict(sorted(final_results_dict[sample].items()))}
 
-        w = csv.DictWriter(tsv, final_results_dict[sample].keys(), delimiter='\t')
+        possible_fieldnames = [
+            "sample",
+            "seqkit_num_seqs",
+            "seqkit_avg_len",
+            "seqkit_AvgQual",
+            "seqkit_GC(%)",
+            "mash_dist",
+            "flye_total_length",
+            "flye_num_contigs",
+            "flye_circ_contigs",
+            "flye_circulocov_nanopore_meandepth",
+            "flye_circulocov_unmapped_nanopore_pc",
+            "flye_circulocov_illumina_meandepth",
+            "flye_circulocov_unmapped_illumina_pc",
+            "flye_busco_reoriented",
+            "flye_busco_clair3",
+            "flye_busco_polypolish",
+            "flye_busco_pypolca",
+            "flye_pypolca_Insertion/Deletion_Errors_Found",
+            "flye_pypolca_Substitution_Errors_Found",
+            "myloasm_total_length",
+            "myloasm_num_contigs",
+            "myloasm_circ_contigs",
+            "myloasm_circulocov_nanopore_meandepth",
+            "myloasm_circulocov_unmapped_nanopore_pc",
+            "myloasm_circulocov_illumina_meandepth",
+            "myloasm_circulocov_unmapped_illumina_pc",
+            "myloasm_busco_reoriented",
+            "myloasm_busco_clair3",
+            "myloasm_busco_polypolish",
+            "myloasm_busco_pypolca",
+            "myloasm_pypolca_Insertion/Deletion_Errors_Found",
+            "myloasm_pypolca_Substitution_Errors_Found",
+            "raven_total_length",
+            "raven_num_contigs",
+            "raven_circ_contigs",
+            "raven_circulocov_nanopore_meandepth",
+            "raven_circulocov_unmapped_nanopore_pc",
+            "raven_circulocov_illumina_meandepth",
+            "raven_circulocov_unmapped_illumina_pc",
+            "raven_busco_reoriented",
+            "raven_busco_clair3",
+            "raven_busco_polypolish",
+            "raven_busco_pypolca",
+            "raven_pypolca_Insertion/Deletion_Errors_Found",
+            "raven_pypolca_Substitution_Errors_Found",
+            "unicycler_total_length",
+            "unicycler_num_contigs",
+            "unicycler_circ_contigs",
+            "unicycler_circulocov_nanopore_meandepth",
+            "unicycler_circulocov_unmapped_nanopore_pc",
+            "unicycler_circulocov_illumina_meandepth",
+            "unicycler_circulocov_unmapped_illumina_pc",
+            "unicycler_busco_unicycler"
+          ]
+
+        fieldnames = []
+        for name in possible_fieldnames:
+          if name in final_results_dict[sample].keys():
+            fieldnames.append(name)
+
+        w = csv.DictWriter(tsv, fieldnames=fieldnames, delimiter='\t')
         if i < 1 :
           w.writeheader()
           i += 1
-        w.writerow(final_results_dict[sample])
+        filtered_row = {k: final_results_dict[sample][k] for k in fieldnames}
+        w.writerow(filtered_row)
 
-def main():
-
-    seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
+seqkit_dict     = seqkit_file('seqkit_summary.tsv') if exists('seqkit_summary.tsv') else {}
     
-    if not seqkit_dict:
-      print('FATAL : Something is wrong and seqkit results were not located.')
-      exit(1)
+if not seqkit_dict:
+  print('FATAL : Something is wrong and seqkit results were not located.')
+  exit(1)
 
-    mash_dict       = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
-    pypolca_dict    = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
-    gfastats_dict   = gfastats_file('gfastats_summary.csv') if exists('gfastats_summary.csv') else {}
-    busco_dict      = busco_results()
-    circulocov_dict = circulocov_results()
+mash_dict          = mash_file('mash_summary.tsv') if exists('mash_summary.tsv') else {}
+pypolca_dict       = pypolca_file('pypolca_summary.tsv') if exists('pypolca_summary.tsv') else {}
+assembly_info_dict = assembly_info_file('assembly_info.csv') if exists('assembly_info.csv') else {}
+busco_dict         = busco_results()
+circulocov_dict    = circulocov_results()
 
-    final_results   = combine_results(seqkit_dict, mash_dict, pypolca_dict, gfastats_dict, busco_dict, circulocov_dict)
+final_results      = combine_results(seqkit_dict, mash_dict, pypolca_dict, assembly_info_dict, busco_dict, circulocov_dict)
 
-    final_file(final_results)
-    tsv_file(final_results)
-
-if __name__ == '__main__':
-  main()
+final_file(final_results)
+tsv_file(final_results)

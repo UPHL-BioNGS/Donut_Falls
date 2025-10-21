@@ -19,20 +19,24 @@ jobs:
         run: |
           mkdir reads
           # from unicycler test data
-          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
-          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
-          #wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
-          wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
+          wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
+          wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
+          #wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
+          wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
 
           mv *fastq.gz reads/.
   
       - name: Run Donut Falls
         run: |
-          nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/github_actions_hybrid_sample_sheet.txt --assembler unicycler
+          nextflow run . -profile docker \
+            -c .github/workflows/github_actions.config \
+            --sample_sheet .github/workflows/github_actions_hybrid_sample_sheet.txt \
+            --assembler unicycler
   
           tree donut_falls
 
       - name: Check files
         run: |
           ls  donut_falls/multiqc/multiqc_report.html
+          ls  donut_falls/test/unicycler/assembly.fasta donut_falls/test/unicycler/assembly.gfa
           cat donut_falls/summary/donut_falls_summary.json

@@ -19,10 +19,10 @@ jobs:
         run: |
             mkdir reads
             # from unicycler test data
-            wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
-            wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
-            #wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
-            wget --quiet https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
+            wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_1.fastq.gz
+            wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/short_reads_2.fastq.gz
+            #wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_high_depth.fastq.gz
+            wget https://github.com/rrwick/Unicycler/raw/69e712eb95c4b9f8a46aade467260260a9ce7a91/sample_data/long_reads_low_depth.fastq.gz
   
             mv *fastq.gz reads/.
 
@@ -30,7 +30,10 @@ jobs:
         run: |
           docker --version
           
-          nextflow run . -profile docker -c .github/workflows/github_actions.config --sample_sheet .github/workflows/ss_lr.csv  --assembler unicycler
+          nextflow run . -profile docker \
+            -c .github/workflows/github_actions.config \
+            --sample_sheet .github/workflows/ss_lr.csv  \
+            --assembler unicycler
 
           tree donut_falls
 

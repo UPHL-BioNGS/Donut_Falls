@@ -1,4 +1,4 @@
-name: Test Donut Falls sample sheet both
+name: Test Donut Falls myloasm assembly
 
 on: [pull_request, workflow_dispatch]
 
@@ -14,26 +14,19 @@ jobs:
         run: |
           wget -qO- get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
- 
-      - name: Get files
-        run: |
-          wget https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
-          tar -xvf dataset.tar.gz
-
-          cp test_files/test_nanopore.fastq.gz test_files/test_nanopore_only.fastq.gz
           
       - name: Run Donut Falls
         run: |
           docker --version
           
-          nextflow run . \
-            -profile docker \
+          nextflow run . -profile docker,test \
             -c .github/workflows/github_actions.config \
-            --sample_sheet .github/workflows/sample_sheet_both.csv
+            --assembler myloasm
 
           tree donut_falls
 
       - name: Check files
         run: |
           ls  donut_falls/multiqc/multiqc_report.html
+          #ls  donut_falls/df/myloasm/assembly_primary.fa donut_falls/df/myloasm/final_contig_graph.gfa
           cat donut_falls/summary/donut_falls_summary.json

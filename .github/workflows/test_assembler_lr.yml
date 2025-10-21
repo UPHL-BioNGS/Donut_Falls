@@ -1,4 +1,4 @@
-name: Test Donut Falls raven assembly
+name: Test Donut Falls flye, raven, unicycler, and myloasm assembly
 
 on: [pull_request, workflow_dispatch]
 
@@ -25,12 +25,18 @@ jobs:
         run: |
           docker --version
           
-          nextflow run . -profile docker,test -c .github/workflows/github_actions.config --assembler raven
+          nextflow run . -profile docker,test \
+            -c .github/workflows/github_actions.config \
+            --assembler flye_raven_myloasm_unicycler
 
           tree donut_falls
 
       - name: Check files
         run: |
           ls  donut_falls/multiqc/multiqc_report.html
+          ls  donut_falls/summary/flye_assembly_info.txt
+          ls  donut_falls/df/flye/assembly.fasta donut_falls/df/flye/assembly_graph.gfa
+          #ls  donut_falls/df/myloasm/assembly_primary.fa donut_falls/df/myloasm/final_contig_graph.gfa
           ls  donut_falls/df/raven/df_raven.fasta donut_falls/df/raven/df_raven.gfa
+          ls  donut_falls/test/unicycler/assembly.fasta donut_falls/test/unicycler/assembly.gfa
           cat donut_falls/summary/donut_falls_summary.json
