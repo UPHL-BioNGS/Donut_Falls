@@ -63,9 +63,10 @@ sample2,sample2.fastq.gz,,
 There are currently several options for assembly
 - [flye](https://github.com/fenderglass/Flye) (default)
 - [raven](https://github.com/lbcb-sci/raven)
+- [myloasm](https://github.com/bluenote-1577/myloasm)
 - [unicycler](https://github.com/rrwick/Unicycler) (requires short reads for hybrid assembly)
 
-These are specified with the `assembler` paramater. If Illumina reads are found, then flye and raven assemblies will be polished with those reads.
+These are specified with the `assembler` paramater. If Illumina reads are found, then flye, myloasm, and raven assemblies will be polished with those reads.
 
 Note: more than one assembler can be chosen (i.e. `params.assembler = 'flye,raven'`). This will run the input files on each assembler listed. Listing an assembler more than once will not create additional assemblies with that tool (i.e. `params.assembler = 'flye,flye,flye'` will still only run the input files through flye once).
 
@@ -80,17 +81,15 @@ nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_
 # hybrid assembly with unicycler where both nanopore and illumina files are required
 nextflow run UPHL-BioNGS/Donut_Falls -profile singularity --sample_sheet sample_sheet.csv --assembler unicycler
 
-# assembling with all three asssemblers
+# assembling with all asssemblers
 # specifying the results to be stored in 'donut_falls_test_results' instead of 'donut_falls'
 # using docker instead of singularity
-nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet.csv --assembler unicycler,flye,raven
+nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet.csv --assembler unicycler_flye_raven_myloasm
 
 
 # using some test files (requires internet connection)
-nextflow run UPHL-BioNGS/Donut_Falls -profile docker --sample_sheet sample_sheet.csv --test
+nextflow run UPHL-BioNGS/Donut_Falls -profile docker,test
 
-# same as above
-nextflow run UPHL-BioNGS/Donut_Falls -profile docker,test --sample_sheet sample_sheet.csv
 ```
 
 ## Acknowledgement
@@ -100,7 +99,7 @@ Donut Falls would not be possible without
 - [bcftools](https://github.com/samtools/bcftools) : apply clair3 polishing
 - [busco](https://gitlab.com/ezlab/busco) : assessment of assembly quality
 - [bwa](https://github.com/lh3/bwa) : aligning reads for polypolish
-- [circulocov](https://github.com/erinyoung/CirculoCov) : read depth per contig
+- [circulocov](https://github.com/erinyoung/CirculoCov) : read depth per contig, aligning reads for clair3
 - [clair3](https://github.com/HKU-BAL/Clair3) : long-read polishing
 - [dnaapler](https://github.com/gbouras13/dnaapler) : rotation
 - [fastp](https://github.com/OpenGene/fastp) : cleaning illumina reads
@@ -109,9 +108,10 @@ Donut Falls would not be possible without
 - [gfastats](https://github.com/vgl-hub/gfastats) : assessment of assembly
 - [mash](https://github.com/marbl/Mash) : determines distance between reads for QC check
 - [multiqc](https://multiqc.info/) : amalgamation of results
+- [myloasm](https://github.com/bluenote-1577/myloasm) : de novo assembly (params.assembler = 'myloasm')
 - [polypolish](https://github.com/rrwick/Polypolish) : reduces sequencing artefacts through polishing with Illumina reads
 - [pypolca](https://github.com/gbouras13/pypolca) : reduces sequencing artefacts through polishing with Illumina reads
 - [rasusa](https://github.com/mbhall88/rasusa) : subsampling nanopore reads to 150X depth
 - [raven](https://github.com/lbcb-sci/raven) : de novo assembly option (params.assembler = 'raven')
-- [seqkit](https://github.com/shenwei356/seqkit) : fastq stats and sorting
+- [seqkit](https://github.com/shenwei356/seqkit) : fastq stats and fasta sorting
 - [unicycler](https://github.com/rrwick/Unicycler) : hybrid assembly option (params.assembler = 'unicycler')
