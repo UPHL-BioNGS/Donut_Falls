@@ -333,7 +333,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:1.2.0'
+  container     'staphb/dnaapler:1.3.0'
   time          '1h'
 
   input:
