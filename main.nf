@@ -1073,7 +1073,7 @@ process seqkit {
   tag           "${meta.id}"
   label         "process_low"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/seqkit:2.10.0'
+  container     'staphb/seqkit:2.10.1'
   time          '10m'
 
   input:
