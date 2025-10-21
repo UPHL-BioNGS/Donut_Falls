@@ -890,7 +890,7 @@ process polypolish {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/polypolish:0.6.0'
+  container     'staphb/polypolish:0.6.1'
   time          '45m'
 
   input:
