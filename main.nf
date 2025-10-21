@@ -718,7 +718,7 @@ process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.30'
+  container     'staphb/multiqc:1.31'
   time          '10m'
 
   input:
