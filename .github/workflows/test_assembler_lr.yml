@@ -37,6 +37,6 @@ jobs:
           ls  donut_falls/summary/flye_assembly_info.txt
           ls  donut_falls/df/flye/assembly.fasta donut_falls/df/flye/assembly_graph.gfa
           #ls  donut_falls/df/myloasm/assembly_primary.fa donut_falls/df/myloasm/final_contig_graph.gfa
-          #ls  donut_falls/df/raven/df_raven.fasta donut_falls/df/raven/df_raven.gfa
+          ls  donut_falls/df/raven/df_raven.fasta donut_falls/df/raven/df_raven.gfa
           ls  donut_falls/test/unicycler/assembly.fasta donut_falls/test/unicycler/assembly.gfa
           cat donut_falls/summary/donut_falls_summary.json
