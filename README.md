@@ -111,7 +111,7 @@ echo "export PATH=$(pwd)/Donut_Falls:$PATH" >> ~/.bashrc
 
 Verify the installation and check the current workflow version:
 ```bash
-donut_falls --version
+donut_falls.sh --version
 ```
 
 ## Usage Examples
@@ -123,7 +123,7 @@ The wrapper script automatically senses whether you are analyzing a single sampl
 Provide the raw Nanopore file alongside paired-end Illumina reads. Use the `--prefix` flag to explicitly name the sample outputs. The `--assembler` flag will assemble the input files with flye (default) and unicycler.
 
 ```bash
-donut_falls \
+donut_falls.sh \
   --fastq nanopore.fastq.gz \
   --fastq_1 illumina_R1.fastq.gz \
   --fastq_2 illumina_R2.fastq.gz \
@@ -137,7 +137,7 @@ donut_falls \
 If you do not have short reads, simply omit the `--fastq_1` and `--fastq_2` flags. The pipeline will automatically pivot to long-read only assembly and polishing protocols. The `--assembler` flag will assemble the reads with myloasm (default: flye).
 
 ```bash
-donut_falls \
+donut_falls.sh \
   --fastq nanopore.fastq.gz \
   --prefix my_longread_sample \
   --outdir ./results \
@@ -152,7 +152,7 @@ Note: If you omit the `--prefix` flag during single-sample execution, the tool w
 For multiple samples, use a sample sheet.
 
 ```bash
-donut_falls \
+donut_falls.sh \
   --sample_sheet structural_manifest.csv \
   --outdir ./results \
    -profile singularity
