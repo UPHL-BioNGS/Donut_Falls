@@ -1,0 +1,73 @@
+name: Test Donut Falls assembly when Illumina reads don't match
+
+on: [pull_request, workflow_dispatch]
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+            
+      - name: Install Nextflow
+        run: |
+            wget -qO- get.nextflow.io | bash
+            sudo mv nextflow /usr/local/bin/
+          
+      - name: Get files
+        run: |
+            # getting actual files
+            wget https://zenodo.org/records/10779911/files/df_test_files.tar.gz?download=1 -O dataset.tar.gz
+            tar -xvf dataset.tar.gz
+
+            rm -rf test_files/*illumina*.fastq.gz
+
+            # downloading measles files (mash distance should be big)
+            wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR355/003/SRR35554603/SRR35554603_1.fastq.gz
+            wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR355/003/SRR35554603/SRR35554603_2.fastq.gz
+
+            mv SRR35554603_1.fastq.gz test_files/test_illumina_1.fastq.gz
+            mv SRR35554603_2.fastq.gz test_files/test_illumina_2.fastq.gz
+
+      - name: Run Donut Falls
+        run: |
+            docker --version
+            
+            nextflow run . -profile docker \
+                -c .github/workflows/github_actions.config \
+                --sample_sheet .github/workflows/sample_sheet_both.csv
+
+      - name: Verify Mismatched Read Filtering (Assertions)
+        run: |
+          tree donut_falls
+
+          fail_count=0
+          
+          for file in donut_falls/summary/flye_assembly_info.txt donut_falls/test/consensus/test_flye_clair3.fasta donut_falls/test/consensus/test_flye_reoriented.fasta
+          do
+            if [ ! -f "$file" ]
+            then
+              echo "FAIL: $file was not generated! Mismatched Illumina reads were not properly ignored."
+              fail_count=$((fail_count + 1))
+            fi
+          done
+
+          for file in donut_falls/test/consensus/test_flye_polypolish.fasta donut_falls/test/consensus/test_flye_pypolca.fasta
+          do
+            if [ -f "$file" ]
+            then
+              echo "FAIL: $file exists!
+              Mismatched Illumina reads were not dropped."
+              fail_count=$((fail_count + 1))
+            fi
+          done
+
+          if [ $fail_count -eq 0 ]
+          then
+            echo "SUCCESS: All assertions passed! Mismatched short-reads were safely ignored by the pipeline."
+          else
+            echo "FAIL: $fail_count assertions failed. Please investigate the above messages."
+            exit 1
+          fi
+

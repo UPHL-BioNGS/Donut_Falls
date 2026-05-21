@@ -1,0 +1,44 @@
+name: Test Workflow for CI
+
+on: [pull_request, workflow_dispatch]
+
+run-name: CI test run
+
+jobs:
+  test:
+    strategy:
+        fail-fast: false
+        matrix:
+            nxf_ver:
+                - '23.10.1'
+                - '24.10.6'
+                - '25.10.4'
+                - '26.04.0'
+                - 'latest-stable'
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Clean up Disk space
+        uses: jlumbroso/free-disk-space@main
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@master
+        with:
+          version: "${{ matrix.nxf_ver }}"
+
+      - name: Run Workflow
+        run: |
+          nextflow run . -profile docker,test \
+            -c .github/workflows/github_actions.config
+
+      - name: Check files
+        run: |
+          ls  donut_falls/multiqc/multiqc_report.html
+          ls  donut_falls/summary/flye_assembly_info.txt
+          ls  donut_falls/df/flye/assembly.fasta donut_falls/df/flye/assembly_graph.gfa
+          cat donut_falls/summary/donut_falls_summary.json
+
+          tree donut_falls
