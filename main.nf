@@ -44,8 +44,8 @@ def paramCheck(keys) {
 process bandage {
   tag           "${meta.id}"
   label         'process_low'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/bandage:0.8.1'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/bandage:0.9.0'
   time          '10m'
 
   input:
@@ -77,8 +77,8 @@ process bandage {
 process bcftools {
   tag           "${meta.id}"
   label         'process_medium'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/bcftools:1.23'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/bcftools:1.23.1'
   time          '10m'
 
   input:
@@ -116,7 +116,7 @@ process bcftools {
 process busco {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/busco:6.0.0-prok-bacteria_odb12_2024-11-14'
   time          '45m'
 
@@ -185,7 +185,7 @@ process bwa {
 process circulocov {
   tag           "${meta.id}"
   label         "process_high"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "circulocov/*/*"
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', pattern: "circulocov/*/*"
   container     'staphb/circulocov:0.1.20240104'
   time          '1h'
 
@@ -230,8 +230,8 @@ process circulocov {
 process clair3 {
   tag           "${meta.id}"
   label         'process_medium'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "clair3/*"
-  container     'staphb/clair3:1.1.0'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', pattern: "clair3/*"
+  container     'staphb/clair3:2.0.0'
   time          '10m'
 
   input:
@@ -254,8 +254,8 @@ process clair3 {
   samtools faidx ${fasta}
 
   run_clair3.sh ${args} \
-    --bam_fn=${bam[0]} \
-    --ref_fn=${fasta} \
+    --bam_fn=\$(pwd)/${bam[0]} \
+    --ref_fn=\$(pwd)/${fasta} \
     --threads=${task.cpus} \
     --output=clair3 \
     --platform=ont \
@@ -273,7 +273,7 @@ process clair3 {
 process copy {
   tag           "${meta.id}"
   label         'process_medium'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/circulocov:0.1.20240104'
   time          '10m'
 
@@ -336,7 +336,7 @@ if not (df['circ.'] == "N").any() and not df.empty:
 process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/dnaapler:1.3.0'
   time          '1h'
 
@@ -379,8 +379,8 @@ process dnaapler {
 process fastp {
   tag           "${meta.id}"
   label         "process_low"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:1.0.1'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/fastp:1.3.3'
 
   input:
   tuple val(meta), file(reads)
@@ -418,7 +418,7 @@ process fastp {
 process fastplong {
   tag           "${meta.id}"
   label         "process_low"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/fastplong:0.4.1'
 
   input:
@@ -455,7 +455,7 @@ process fastplong {
 process flye {
   tag           "${meta.id}"
   label         "process_high"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/flye:2.9.6'
   time          '10h'
 
@@ -548,7 +548,7 @@ with open("${fasta}") as infile, open("flye/${prefix}_flye.fasta", "w") as outfi
 process gfastats {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}/raven", mode: 'copy', pattern: "gfastats/*"
+  publishDir path: { "${params.outdir}/${meta.id}/raven" }, mode: 'copy', pattern: "gfastats/*"
   container     'staphb/gfastats:1.3.11'
   time          '10m'
 
@@ -671,7 +671,7 @@ df.to_csv(
 process mash {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', pattern: "mash/*.mashdist.txt"
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', pattern: "mash/*.mashdist.txt"
   container     'staphb/mash:2.3'
   time          '30m'
   
@@ -722,7 +722,7 @@ process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.33'
+  container     'staphb/multiqc:1.34'
   time          '10m'
 
   input:
@@ -747,8 +747,8 @@ process multiqc {
 process myloasm {
   tag           "${meta.id}"
   label         "process_high"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/myloasm:0.3.0'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/myloasm:0.5.1'
   time          '10h'
 
   input:
@@ -837,7 +837,7 @@ shutil.copy("${fasta}", "${prefix}_myloasm.fasta")
 process png {
   tag           "${meta.id}"
   label         "process_low"
-  publishDir    "${params.outdir}/${meta.id}/bandage", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}/bandage" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/multiqc:1.33'
   time          '10m'
 
@@ -893,7 +893,7 @@ process png {
 process polypolish {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/polypolish:0.6.1'
   time          '45m'
 
@@ -939,7 +939,7 @@ process polypolish {
 process pypolca {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/pypolca:0.4.0'
   time          '30m'
   
@@ -1000,8 +1000,8 @@ process pypolca {
 process rasusa {
   tag           "${meta.id}"
   label         "process_medium"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/rasusa:2.2.2'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/rasusa:4.1.0'
   time          '10m'
 
   input:
@@ -1038,8 +1038,8 @@ process rasusa {
 process raven {
   tag           "${meta.id}"
   label         "process_high"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/raven:1.8.3'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/raven:1.8.3-noble'
   time          '10h'
 
   input:
@@ -1076,8 +1076,8 @@ process raven {
 process seqkit {
   tag           "${meta.id}"
   label         "process_low"
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/seqkit:2.12.0'
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  container     'staphb/seqkit:2.13.0'
   time          '10m'
 
   input:
@@ -1118,7 +1118,7 @@ process sort {
   tag           "${meta.id}"
   label         "process_low"
   // no publishDir
-  container     'staphb/seqkit:2.10.0'
+  container     'staphb/seqkit:2.13.0'
   time          '10m'
 
   input:
@@ -1489,7 +1489,7 @@ tsv_file(final_results)
 process unicycler {
   tag           "${meta.id}"
   label         'process_high'
-  publishDir    "${params.outdir}/${meta.id}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+  publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
   container     'staphb/unicycler:0.5.1'
   time          '10h'
 
@@ -1724,37 +1724,37 @@ workflow DONUT_FALLS {
 
   main:
     // channel for gfa files
-    ch_gfa = Channel.empty()
+    ch_gfa = channel.empty()
     // channel for files for multiqc or workflow summary
-    ch_summary           = Channel.empty()
+    ch_summary           = channel.empty()
     // channel for all assembled genomes at all phases
-    ch_consensus         = Channel.empty()
+    ch_consensus         = channel.empty()
     // channel for files formatted like assembly_info.txt
-    ch_assembly_info     = Channel.empty()
+    ch_assembly_info     = channel.empty()
     // channel for de novo assembled genomes after reorienting
-    ch_reoriented        = Channel.empty()
+    ch_reoriented        = channel.empty()
     // channel for de novo assembled genomes after clair3 polishing
-    ch_clair3_fa         = Channel.empty()
+    ch_clair3_fa         = channel.empty()
     // channel for de novo assembled genomes after polypolish polishing
-    ch_polypolish_fa     = Channel.empty()
+    ch_polypolish_fa     = channel.empty()
     // channel for de novo assembled genomes after pypolca polishing
-    ch_pypolca_fa        = Channel.empty()
+    ch_pypolca_fa        = channel.empty()
     // channel for hybrid assembled genomes with unicycler
-    ch_unicycler_fa      = Channel.empty()
+    ch_unicycler_fa      = channel.empty()
     // channel for assembled genomes with flye
-    ch_flye_fa           = Channel.empty()
+    ch_flye_fa           = channel.empty()
     // channel for assembled genomes with raven
-    ch_raven_fa          = Channel.empty()
+    ch_raven_fa          = channel.empty()
     // channel for assembled genomes with myloasm
-    ch_myloasm_fa        = Channel.empty()
+    ch_myloasm_fa        = channel.empty()
     // versions channel
-    ch_versions          = Channel.empty()
+    ch_versions          = channel.empty()
 
     // list of available assemblers
     def assemblers = ['flye', 'raven', 'unicycler', 'myloasm']
 
     // finding how many time each sample is getting assembled
-    def num_assemblers = assemblers.findAll { params.assembler.contains(it) }.size()
+    def num_assemblers = assemblers.findAll { it -> params.assembler.contains(it) }.size()
 
     // get the mash distance between illumina and nanopore reads
     // this is helpful because these should be very close
@@ -1777,7 +1777,7 @@ workflow DONUT_FALLS {
     ch_versions = ch_versions.mix(mash.out.versions.first())
 
     // general qc information
-    seqkit(ch_nanopore_input.mix(ch_illumina_input.transpose()).groupTuple().filter{it})
+    seqkit(ch_nanopore_input.mix(ch_illumina_input.transpose()).groupTuple().filter{it -> it})
 
     seqkit.out.stats
       .collectFile(
@@ -1793,7 +1793,7 @@ workflow DONUT_FALLS {
     // filter out Illumina reads that differ from their Nanopore pairs
     ch_illumina_input
       .join(ch_mash_dist, by: 0)
-      .filter{it[2] as float < 0.5}
+      .filter{it -> it[2] as float < 0.5}
       .map{it -> tuple(it[0], it[1])}
       .set {ch_dist_filter}
 
@@ -1819,7 +1819,7 @@ workflow DONUT_FALLS {
 
     if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
       // quality filter
-      fastp(ch_dist_filter.map { it -> [it[0], it[1]]}.filter{it[0]})
+      fastp(ch_dist_filter.map { it -> [it[0], it[1]]}.filter{it -> it[0]})
       ch_versions = ch_versions.mix(fastp.out.versions.first())
       ch_summary  = ch_summary.mix(fastp.out.summary)
 
@@ -1935,7 +1935,7 @@ workflow DONUT_FALLS {
       ch_clair3_fa
         .join(ch_dist_filter.flatMap { tuple -> (1..num_assemblers).collect { tuple } }, by: 0, remainder: true)
         .filter{ it -> if (it) {it[1]}}
-        .filter{ it[2] }
+        .filter{ it -> it[2] }
         .set{ ch_clair3_polished }
 
       bwa(ch_clair3_polished)
@@ -2073,7 +2073,7 @@ workflow {
   // fastq_2 = illumina fastq file
 
   if (params.sample_sheet) {
-    Channel
+    channel
       .fromPath("${params.sample_sheet}", type: "file")
       .splitCsv( header: true, sep: ',' )
       .map { it ->
@@ -2085,12 +2085,12 @@ workflow {
       }
       .set{ ch_input_files }
   } else {
-    ch_input_files = Channel.empty()
+    ch_input_files = channel.empty()
   }
 
   // channel for illumina files (paired-end only)
   ch_input_files
-    .filter { it[2] != it[3] }
+    .filter { it -> it[2] != it[3] }
     .map { it -> tuple(it[0], [file(it[2], checkIfExists: true), file(it[3], checkIfExists: true)])}
     .set { ch_illumina_input }
 
@@ -2100,7 +2100,7 @@ workflow {
     .set { ch_nanopore_input }
 
   if (params.test) {
-    ch_test_out = Channel.empty()
+    ch_test_out = channel.empty()
     test()
 
     if (params.assembler =~ /flye/ || params.assembler =~ /myloasm/ || params.assembler =~ /raven/ ) {
@@ -2134,7 +2134,7 @@ workflow {
       .set { ch_test_nanopore }
 
     ch_test_out
-      .filter{ it[2] }
+      .filter{ it -> it[2] }
       .map{it -> tuple(it[0], it[2])}
       .set { ch_test_illumina }
 
@@ -2144,15 +2144,22 @@ workflow {
 
   DONUT_FALLS(ch_nanopore_input, ch_illumina_input.ifEmpty([]))
 
+  println("""
+Upon completion, the following files can be found in the output directory:
 
-}
+${params.outdir}
+├──summary/donut_falls_summary.{tsv,json} # files with summarized results
+├──multiqc/multiqc_report.html # multiqc report
+└──sample/consensus # consensus fasta files for organism
 
+The fasta files are from each phase of assembly: 
+Stage 1. unpolished/reoriented
+Stage 2. polished with clair3
+Stage 3. polished with polypolish (if illumina reads are supplied) 
+Stage 4. polished with pypolca
 
-workflow.onComplete {
-  println("Pipeline completed at: $workflow.complete")
-  println("The multiqc report can be found at ${params.outdir}/multiqc/multiqc_report.html")
-  println("The consensus fasta files can be found in ${params.outdir}/sample/consensus")
-  println("The fasta files are from each phase of assembly: unpolished/reoriented -> clair3 -> polypolish (if illumina reads are supplied) -> pypolca")
-  println("Execution status: ${ workflow.success ? 'OK' : 'failed' }")
+Fasta files starting with sub* are from assemblies where all sequences 
+are closed and headers have been renamed for NCBI submission.
+""")
 }
 

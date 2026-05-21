@@ -92,6 +92,72 @@ nextflow run UPHL-BioNGS/Donut_Falls -profile docker,test
 
 ```
 
+## donut_falls cli
+
+For those who'd rather avoid nextflow syntax, Donut Falls can be run on a single set of input files on the command line. To use the workflow via the command line interface, clone the repository and add it to your environment's PATH.
+
+As a warning, this is an experimental feature. Please [submit an issue](https://github.com/UPHL-BioNGS/Donut_Falls) if there are problems with this feature.
+
+```bash
+# Clone the repository
+git clone https://github.com/UPHL-BioNGS/Donut_Falls.git
+
+# Add the pipeline directory to your current session's PATH
+export PATH=$(pwd)/Donut_Falls:$PATH
+
+# (Optional) Make the PATH persistent across terminal sessions
+echo "export PATH=$(pwd)/Donut_Falls:$PATH" >> ~/.bashrc
+```
+
+Verify the installation and check the current workflow version:
+```bash
+donut_falls.sh --version
+```
+
+## Usage Examples
+
+The wrapper script automatically senses whether you are analyzing a single sample directly or a large batch via a sample sheet.
+
+### Single Sample with both Illumina and Nanopore reads
+
+Provide the raw Nanopore file alongside paired-end Illumina reads. Use the `--prefix` flag to explicitly name the sample outputs. The `--assembler` flag will assemble the input files with flye (default) and unicycler.
+
+```bash
+donut_falls.sh \
+  --fastq nanopore.fastq.gz \
+  --fastq_1 illumina_R1.fastq.gz \
+  --fastq_2 illumina_R2.fastq.gz \
+  --prefix my_sample_id \
+  --outdir ./results \
+  -profile docker \
+  --assembler flye,unicycler
+```
+
+### Single Sample with only Nanopore reads
+If you do not have short reads, simply omit the `--fastq_1` and `--fastq_2` flags. The pipeline will automatically pivot to long-read only assembly and polishing protocols. The `--assembler` flag will assemble the reads with myloasm (default: flye).
+
+```bash
+donut_falls.sh \
+  --fastq nanopore.fastq.gz \
+  --prefix my_longread_sample \
+  --outdir ./results \
+  -profile docker \
+  --assembler myloasm
+```
+
+Note: If you omit the `--prefix` flag during single-sample execution, the tool will automatically deduce the sample name using the base prefix of your `--fastq` file.
+
+### Using a Sample Sheet
+
+For multiple samples, use a sample sheet.
+
+```bash
+donut_falls.sh \
+  --sample_sheet structural_manifest.csv \
+  --outdir ./results \
+   -profile singularity
+```
+
 ## Acknowledgement
 
 Donut Falls would not be possible without

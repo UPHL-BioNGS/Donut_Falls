@@ -112,8 +112,8 @@ do
       if [ -z "$R1" ]
       then
         echo "Looking in /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}."
-        R1=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R1*fastq.gz" -o -name "$altid*$ilrun*R1*fastq.gz" | head -n 1 )
-        R2=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*$ilrun*R2*fastq.gz" -o -name "$altid*$ilrun*R2*fastq.gz" | head -n 1 )
+        R1=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*R1*fastq.gz" -o -name "$altid*R1*fastq.gz" | head -n 1 )
+        R2=$(find /Volumes/NGS_2/pulsenet_and_arln/old_runs/${year}/$ilrun -name "$labid*R2*fastq.gz" -o -name "$altid*R2*fastq.gz" | head -n 1 )
       fi
     done
 
