@@ -254,8 +254,8 @@ process clair3 {
   samtools faidx ${fasta}
 
   run_clair3.sh ${args} \
-    --bam_fn=${bam[0]} \
-    --ref_fn=${fasta} \
+    --bam_fn=\$(pwd)/${bam[0]} \
+    --ref_fn=\$(pwd)/${fasta} \
     --threads=${task.cpus} \
     --output=clair3 \
     --platform=ont \
