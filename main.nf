@@ -1001,7 +1001,7 @@ process rasusa {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/rasusa:4.1.0'
+  container     'staphb/rasusa:5.1.0'
   time          '10m'
 
   input:
