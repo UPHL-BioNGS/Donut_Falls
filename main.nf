@@ -78,7 +78,7 @@ process bcftools {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/bcftools:1.23.1'
+  container     'staphb/bcftools:1.24'
   time          '10m'
 
   input:
@@ -231,7 +231,7 @@ process clair3 {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', pattern: "clair3/*"
-  container     'staphb/clair3:2.0.0'
+  container     'staphb/clair3:2.0.2'
   time          '10m'
 
   input:
@@ -337,7 +337,7 @@ process dnaapler {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/dnaapler:1.3.0'
+  container     'staphb/dnaapler:1.4.0'
   time          '1h'
 
   input:
@@ -380,7 +380,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:1.3.3'
+  container     'staphb/fastp:1.3.6'
 
   input:
   tuple val(meta), file(reads)
@@ -722,7 +722,7 @@ process multiqc {
   tag           "combining reports"
   label         "process_low"
   publishDir    "${params.outdir}", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.34'
+  container     'staphb/multiqc:1.35'
   time          '10m'
 
   input:
@@ -748,7 +748,7 @@ process myloasm {
   tag           "${meta.id}"
   label         "process_high"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/myloasm:0.5.1'
+  container     'staphb/myloasm:0.6.0'
   time          '10h'
 
   input:
@@ -838,7 +838,7 @@ process png {
   tag           "${meta.id}"
   label         "process_low"
   publishDir path: { "${params.outdir}/${meta.id}/bandage" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.33'
+  container     'staphb/multiqc:1.35'
   time          '10m'
 
   input:
@@ -1001,7 +1001,7 @@ process rasusa {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/rasusa:4.1.0'
+  container     'staphb/rasusa:5.1.0'
   time          '10m'
 
   input:
@@ -1155,7 +1155,7 @@ process summary {
   tag           "Creating summary"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.33'
+  container     'staphb/multiqc:1.35'
   time          '30m'
   
   input:
@@ -1581,7 +1581,7 @@ process versions {
   tag           "extracting versions"
   label         "process_low"
   publishDir    "${params.outdir}/summary", mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/multiqc:1.33'
+  container     'staphb/multiqc:1.35'
   time          '30m'
   
   input:
