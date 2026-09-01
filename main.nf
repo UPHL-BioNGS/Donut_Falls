@@ -78,7 +78,7 @@ process bcftools {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/bcftools:1.23.1'
+  container     'staphb/bcftools:1.24'
   time          '10m'
 
   input:
