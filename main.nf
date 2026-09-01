@@ -748,7 +748,7 @@ process myloasm {
   tag           "${meta.id}"
   label         "process_high"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/myloasm:0.5.1'
+  container     'staphb/myloasm:0.6.0'
   time          '10h'
 
   input:
