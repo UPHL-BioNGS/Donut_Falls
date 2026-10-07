@@ -380,7 +380,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:1.3.6'
+  container     'staphb/fastp:1.3.7'
 
   input:
   tuple val(meta), file(reads)
