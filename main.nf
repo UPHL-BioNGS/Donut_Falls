@@ -231,7 +231,7 @@ process clair3 {
   tag           "${meta.id}"
   label         'process_medium'
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', pattern: "clair3/*"
-  container     'staphb/clair3:2.0.2'
+  container     'staphb/clair3:2.0.3'
   time          '10m'
 
   input:
@@ -380,7 +380,7 @@ process fastp {
   tag           "${meta.id}"
   label         "process_low"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastp:1.3.6'
+  container     'staphb/fastp:1.3.7'
 
   input:
   tuple val(meta), file(reads)
@@ -419,7 +419,7 @@ process fastplong {
   tag           "${meta.id}"
   label         "process_low"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/fastplong:0.4.1'
+  container     'staphb/fastplong:0.7.0'
 
   input:
   tuple val(meta), file(reads)
@@ -748,7 +748,7 @@ process myloasm {
   tag           "${meta.id}"
   label         "process_high"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/myloasm:0.6.0'
+  container     'staphb/myloasm:0.7.0'
   time          '10h'
 
   input:
@@ -894,7 +894,7 @@ process polypolish {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/polypolish:0.6.1'
+  container     'staphb/polypolish:0.7.1'
   time          '45m'
 
   input:
@@ -940,7 +940,7 @@ process pypolca {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/pypolca:0.4.0'
+  container     'staphb/pypolca:0.5.0'
   time          '30m'
   
   input:
