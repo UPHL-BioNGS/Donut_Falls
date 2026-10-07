@@ -940,7 +940,7 @@ process pypolca {
   tag           "${meta.id}"
   label         "process_medium"
   publishDir path: { "${params.outdir}/${meta.id}" }, mode: 'copy', saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-  container     'staphb/pypolca:0.4.0'
+  container     'staphb/pypolca:0.5.0'
   time          '30m'
   
   input:
